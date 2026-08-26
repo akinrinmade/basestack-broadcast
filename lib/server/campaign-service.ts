@@ -10,6 +10,49 @@ export interface EligibleSubscriber {
   unsubscribe_token: string
 }
 
+/**
+ * Thrown by claimCampaignForSending() when another request has already
+ * claimed this campaign. Callers must NOT mark the campaign 'failed' when
+ * they catch this — doing so would stomp on whatever the winning process
+ * is doing (or has already done).
+ */
+export class CampaignAlreadyClaimedError extends Error {
+  constructor() {
+    super('This campaign is already being sent (or was already sent) by another request.')
+    this.name = 'CampaignAlreadyClaimedError'
+  }
+}
+
+/**
+ * Atomically moves a campaign from a sendable status (draft, scheduled,
+ * failed) to 'sending' via a conditional UPDATE ... WHERE status IN (...).
+ *
+ * This is the actual double-send guard. The `campaign_sends` unique
+ * constraint (campaign_id, subscriber_id) only protects *sequential*
+ * retries — it does nothing to stop two requests that are mid-flight at
+ * the same instant (e.g. an overlapping/retried cron invocation, or cron
+ * firing at the same moment someone clicks "Send" manually) from both
+ * reading "no existing sends yet" and both calling Resend for the same
+ * recipient. A conditional UPDATE is atomic at the database level, so
+ * only one caller can ever win the row; the loser gets
+ * CampaignAlreadyClaimedError before it sends a single email.
+ */
+async function claimCampaignForSending(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  campaignId: string,
+): Promise<void> {
+  const { data, error } = await admin
+    .from('campaigns')
+    .update({ status: 'sending' })
+    .eq('id', campaignId)
+    .in('status', ['draft', 'scheduled', 'failed'])
+    .select('id')
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!data) throw new CampaignAlreadyClaimedError()
+}
+
 function getAppUrl(request: Request): string {
   const configured = process.env.NEXT_PUBLIC_APP_URL
   if (configured) return configured.replace(/\/$/, '')
@@ -77,6 +120,11 @@ export async function sendCampaignToRecipients(
 ): Promise<SendCampaignResult> {
   const admin = getSupabaseAdmin()
 
+  // Claim the campaign first, before touching recipients or Resend at all —
+  // see claimCampaignForSending() for why this is what actually makes
+  // concurrent sends safe.
+  await claimCampaignForSending(admin, campaign.id)
+
   const [{ data: settings }, recipients] = await Promise.all([
     admin.from('settings').select('mailing_address').eq('id', 1).maybeSingle(),
     getEligibleRecipients(campaign.recipient_filter),
@@ -93,7 +141,7 @@ export async function sendCampaignToRecipients(
 
   await admin
     .from('campaigns')
-    .update({ status: 'sending', recipient_count: recipients.length })
+    .update({ recipient_count: recipients.length })
     .eq('id', campaign.id)
 
   const from = resolveFromAddress(campaign)

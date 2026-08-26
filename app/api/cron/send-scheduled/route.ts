@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
-import { sendCampaignToRecipients } from '@/lib/server/campaign-service'
+import { CampaignAlreadyClaimedError, sendCampaignToRecipients } from '@/lib/server/campaign-service'
 import type { Campaign } from '@/lib/types'
 
 /**
@@ -12,10 +12,13 @@ import type { Campaign } from '@/lib/types'
  * so this route rejects any call that doesn't present that secret — without
  * it, this URL would be a public, unauthenticated way to trigger mass sends.
  *
- * Safe to run on a short interval: sendCampaignToRecipients() is
- * idempotent per-recipient (it skips subscribers who already have a
- * successful campaign_sends row), so overlapping or repeated runs can't
- * double-send to someone.
+ * Safe to run on a short interval, and safe if two invocations overlap:
+ * sendCampaignToRecipients() first claims each campaign with an atomic
+ * conditional UPDATE (status must be draft/scheduled/failed to become
+ * 'sending'), so only one concurrent caller ever proceeds to send. It's
+ * also idempotent per-recipient on retries (skips subscribers who already
+ * have a successful campaign_sends row), so a campaign that failed
+ * partway can be safely picked up again on the next run.
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization') ?? request.headers.get('Authorization')
@@ -53,6 +56,16 @@ export async function GET(request: Request) {
       const result = await sendCampaignToRecipients(campaign, request)
       results.push({ id: campaign.id, name: campaign.name, ...result })
     } catch (err) {
+      if (err instanceof CampaignAlreadyClaimedError) {
+        // Another invocation (an overlapping cron run, or someone hitting
+        // "Send" manually) already claimed this campaign. Don't touch its
+        // status — that process owns it now.
+        console.warn('[cron/send-scheduled] campaign already claimed elsewhere, skipping', {
+          id: campaign.id,
+        })
+        results.push({ id: campaign.id, name: campaign.name, status: 'skipped' as const })
+        continue
+      }
       console.error('[cron/send-scheduled] send failed', { id: campaign.id, err })
       await admin.from('campaigns').update({ status: 'failed' }).eq('id', campaign.id)
       results.push({

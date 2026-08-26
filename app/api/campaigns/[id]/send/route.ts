@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/supabase/route-auth'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { checkResendConfig } from '@/lib/resend'
-import { sendCampaignToRecipients } from '@/lib/server/campaign-service'
+import { CampaignAlreadyClaimedError, sendCampaignToRecipients } from '@/lib/server/campaign-service'
 import type { Campaign } from '@/lib/types'
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -67,6 +67,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       failedCount: result.failedCount,
     })
   } catch (err) {
+    if (err instanceof CampaignAlreadyClaimedError) {
+      // The scheduled-jobs cron (or another request) is already sending
+      // this campaign right now. Don't mark it 'failed' — that process
+      // owns the status from here.
+      return NextResponse.json(
+        { error: 'This campaign is already being sent right now.' },
+        { status: 409 },
+      )
+    }
     console.error('[api/campaigns/send] failed', err)
     await admin.from('campaigns').update({ status: 'failed' }).eq('id', id)
     return NextResponse.json(
