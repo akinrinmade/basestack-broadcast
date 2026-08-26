@@ -51,16 +51,15 @@
 - Suppression reason + bounce count now surface inline in the subscribers table under the status badge
 
 **Still open:**
-- Delivery metrics beyond sent/failed counts
-- Aggregate delivery trends over time
+- Delivery metrics beyond the current send/open/click counts
 
-## Phase 6 — Polish (NOT STARTED)
-- Dashboard charts and trends
-- Audit logging
-- Team management
-- Role-based access control
-- Admin user provisioning UI (currently Supabase dashboard/SQL only)
-- "Forgot password" flow
+## Phase 6 — Polish (IN PROGRESS)
+- Dashboard send trends
+- Audit logging for subscriber and campaign mutations
+- Team management with invite and role controls
+- Role-based access control (`admin`, `editor`, `viewer`)
+- Forgot-password flow
+- Admin user provisioning UI (team invitations are now supported; Supabase remains the recovery path for the first admin)
 
 ## To fully activate what's already built
 

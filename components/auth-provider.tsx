@@ -9,6 +9,8 @@ interface AuthContextValue {
   session: Session | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
+  resetPassword: (email: string) => Promise<{ error: string | null }>
+  updatePassword: (password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
 }
 
@@ -17,6 +19,8 @@ const AuthContext = createContext<AuthContextValue>({
   session: null,
   loading: true,
   signIn: async () => ({ error: 'Not implemented' }),
+  resetPassword: async () => ({ error: 'Not implemented' }),
+  updatePassword: async () => ({ error: 'Not implemented' }),
   signOut: async () => {},
 })
 
@@ -53,8 +57,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut()
   }, [])
 
+  const resetPassword = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    return { error: error?.message ?? null }
+  }, [])
+
+  const updatePassword = useCallback(async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password })
+    return { error: error?.message ?? null }
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, resetPassword, updatePassword, signOut }}>
       {children}
     </AuthContext.Provider>
   )

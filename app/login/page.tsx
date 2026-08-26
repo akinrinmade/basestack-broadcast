@@ -7,12 +7,13 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/auth-provider'
 
 export default function LoginPage() {
-  const { signIn, user, loading: authLoading } = useAuth()
+  const { signIn, resetPassword, user, loading: authLoading } = useAuth()
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sent, setSent] = useState(false)
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -34,6 +35,19 @@ export default function LoginPage() {
       setLoading(false)
     }
     // On success, onAuthStateChange + useEffect will redirect
+  }
+
+  async function handleReset() {
+    if (!email.trim()) {
+      setError('Enter your email address first.')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    const result = await resetPassword(email.trim())
+    if (result.error) setError(result.error)
+    else setSent(true)
+    setLoading(false)
   }
 
   return (
@@ -87,10 +101,15 @@ export default function LoginPage() {
               {error}
             </p>
           )}
+          {sent && <p className="text-sm text-primary" role="status">Check your inbox for a password reset link.</p>}
           <Button type="submit" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign in'}
           </Button>
         </form>
+
+        <button type="button" onClick={handleReset} disabled={loading} className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-foreground">
+          Forgot password?
+        </button>
 
         <p className="mt-5 text-center font-mono text-[10px] text-muted-foreground">
           Basestack Academy · Admin access only

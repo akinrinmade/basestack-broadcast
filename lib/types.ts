@@ -124,3 +124,23 @@ export interface CampaignSend {
   open_count: number
   click_count: number
 }
+
+export type TeamRole = 'admin' | 'editor' | 'viewer'
+
+export interface TeamMember {
+  user_id: string
+  email: string
+  role: TeamRole
+  created_at: string
+  updated_at: string
+}
+
+export interface AuditLog {
+  id: string
+  actor_id: string | null
+  action: string
+  entity_type: string
+  entity_id: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+}

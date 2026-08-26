@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Activity, Bell, LayoutDashboard, LogOut, Mail, Menu, MoveHorizontal as MoreHorizontal, Search, Send, Settings2, Users, X } from 'lucide-react'
+import { Activity, Bell, LayoutDashboard, LogOut, Mail, Menu, Search, Send, Settings2, Users, UserRoundCog, X } from 'lucide-react'
 import { useAuth } from '@/components/auth-provider'
 
 const nav = [
@@ -11,6 +11,7 @@ const nav = [
   { label: 'Subscribers', href: '/subscribers', icon: Users },
   { label: 'Compose', href: '/compose', icon: Mail },
   { label: 'Campaigns', href: '/campaigns', icon: Send },
+  { label: 'Team', href: '/team', icon: UserRoundCog },
 ]
 
 function Logo() {

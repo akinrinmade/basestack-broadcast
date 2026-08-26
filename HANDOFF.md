@@ -1,10 +1,10 @@
 # Handoff
 
 ## Current Phase
-Phase 5 — Deliverability
+Phase 6 — Polish
 
 ## Status
-IN PROGRESS. Rate limiting, bounce/complaint webhook, and CSV export are done. Not yet fully activated in production — see "Environment Variables Required" below.
+IN PROGRESS. Core Phase 6 features are implemented. Production activation still requires the environment variables, Supabase migrations, and Resend webhook setup below.
 
 ## Completed Work
 
@@ -13,6 +13,9 @@ IN PROGRESS. Rate limiting, bounce/complaint webhook, and CSV export are done. N
 - Bounce/complaint webhook (`app/api/webhooks/resend/route.ts`, `lib/server/resend-webhook.ts`): verifies Resend's Svix-style HMAC signature (with a 5-minute replay-timestamp tolerance) before processing. On `email.complained` or a non-transient `email.bounced`, sets the matching subscriber to `status = 'suppressed'` with a `suppression_reason`. Transient/soft bounces only increment `bounce_count`. Requires `RESEND_WEBHOOK_SECRET` and a webhook configured in the Resend dashboard pointing at `/api/webhooks/resend` — neither is set up yet.
 - CSV export (`lib/csv.ts` → `exportSubscribersToCsv`, wired into `app/subscribers/page.tsx`): exports the currently filtered/visible subscriber list as a CSV download. Excludes `confirm_token`/`unsubscribe_token` on purpose (those tokens grant unauthenticated write access to that subscriber's status).
 - Subscribers table now shows `suppression_reason` and `bounce_count` inline under the status badge when a subscriber is suppressed.
+- Dashboard shows successful sends across the six most recent weekly buckets.
+- Team page supports admin invitations, role changes, member removal, and recent audit activity.
+- Login supports password reset email requests; `/reset-password` handles the recovery session and password update.
 
 ### Authentication (Phase 2)
 - Auth context provider (`components/auth-provider.tsx`) with `useAuth()` hook
@@ -74,7 +77,7 @@ IN PROGRESS. Rate limiting, bounce/complaint webhook, and CSV export are done. N
 - `NEXT_PUBLIC_APP_URL` (optional but recommended once deployed, so confirm/unsubscribe links don't depend on request origin)
 - `RESEND_WEBHOOK_SECRET` — without this, `/api/webhooks/resend` returns 503 and bounces/complaints are never processed
 
-**Migrations not yet applied:** `0004_create_rate_limits.sql` and `0005_add_campaign_engagement.sql` need to be run against Supabase before rate limiting and engagement metrics work.
+**Migrations not yet applied:** `0004_create_rate_limits.sql`, `0005_add_campaign_engagement.sql`, and `0006_team_roles_audit.sql` need to be run against Supabase before the related features work.
 
 ## Known Issues
 - No admin user provisioning UI — admin users must be created via Supabase dashboard or SQL.

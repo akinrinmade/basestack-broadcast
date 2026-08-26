@@ -137,10 +137,5 @@ No server-side secrets are stored in the database or exposed to the frontend bun
 
 These are the remaining items before the roadmap is fully complete — see `ROADMAP.md` and `HANDOFF.md` for details:
 
-- No aggregate delivery trends over time
-- No suppression-list *UI* beyond the inline reason/bounce-count note on the subscribers table (auto-suppression itself is now handled by the webhook)
-- No role-based access control — every authenticated user is a full admin
-- No admin user provisioning UI (Supabase dashboard/SQL only)
-- No "forgot password" flow
-- No dashboard charts/trends (counts only)
-- No audit logging
+- Trend view currently covers the six most recent weekly send buckets; date-range comparison is not yet available
+- Image uploads for campaign content remain unimplemented

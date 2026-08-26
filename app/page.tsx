@@ -88,6 +88,17 @@ export default function DashboardPage() {
 
   const recentCampaigns = campaigns.slice(0, 5)
   const nextScheduled = campaigns.find((c) => c.status === 'scheduled')
+  const trend = Array.from({ length: 6 }, (_, index) => {
+    const date = new Date()
+    date.setDate(date.getDate() - (5 - index) * 7)
+    const start = new Date(date)
+    start.setDate(start.getDate() - 6)
+    const sent = campaigns
+      .filter((campaign) => campaign.sent_at && new Date(campaign.sent_at) >= start && new Date(campaign.sent_at) <= date)
+      .reduce((total, campaign) => total + campaign.sent_count, 0)
+    return { label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), sent }
+  })
+  const maxTrend = Math.max(...trend.map((point) => point.sent), 1)
 
   return (
     <AdminShell>
@@ -211,6 +222,22 @@ export default function DashboardPage() {
                     ))}
                   </div>
                 )}
+              </section>
+
+              <section className="rounded-xl border border-border bg-card">
+                <div className="border-b border-border px-5 py-4">
+                  <h2 className="font-semibold">Send trend</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">Successful deliveries by week</p>
+                </div>
+                <div className="flex h-52 items-end gap-2 px-5 py-6">
+                  {trend.map((point) => (
+                    <div key={point.label} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
+                      <span className="font-mono text-[10px] text-muted-foreground">{point.sent}</span>
+                      <div className="w-full rounded-t bg-primary/80" style={{ height: `${Math.max((point.sent / maxTrend) * 100, point.sent ? 8 : 2)}%` }} />
+                      <span className="font-mono text-[9px] text-muted-foreground">{point.label}</span>
+                    </div>
+                  ))}
+                </div>
               </section>
 
               <section className="rounded-xl border border-border bg-card">
