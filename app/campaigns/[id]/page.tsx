@@ -114,6 +114,11 @@ function CampaignDetailContent({ id }: { id: string }) {
 
   const canEdit = ['draft', 'failed'].includes(campaign.status)
   const canSend = ['draft', 'failed'].includes(campaign.status)
+  const deliveredCount = sends.filter((send) => send.status === 'sent').length
+  const openedCount = sends.filter((send) => (send.open_count ?? 0) > 0).length
+  const clickedCount = sends.filter((send) => (send.click_count ?? 0) > 0).length
+  const engagementRate = (count: number) =>
+    deliveredCount > 0 ? `${Math.round((count / deliveredCount) * 100)}%` : '—'
 
   return (
     <div className="flex flex-col gap-6">
@@ -153,6 +158,12 @@ function CampaignDetailContent({ id }: { id: string }) {
         <Stat label="Recipients" value={campaign.recipient_count.toLocaleString()} />
         <Stat label="Sent" value={campaign.sent_count.toLocaleString()} />
         <Stat label="Failed" value={campaign.failed_count.toLocaleString()} />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Stat label="Unique opens" value={`${openedCount.toLocaleString()} (${engagementRate(openedCount)})`} />
+        <Stat label="Unique clicks" value={`${clickedCount.toLocaleString()} (${engagementRate(clickedCount)})`} />
+        <Stat label="Delivery rate" value={campaign.recipient_count > 0 ? `${Math.round((deliveredCount / campaign.recipient_count) * 100)}%` : '—'} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

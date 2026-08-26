@@ -13,7 +13,7 @@ Done so far:
 - Resend webhook receiver (`/api/webhooks/resend`) — auto-suppresses subscribers on hard bounces and spam complaints, increments `bounce_count` on every bounce (including soft ones)
 - Subscriber CSV export from the subscribers page (respects the current search/status filter)
 
-Still open: suppression list UI beyond the inline badge note, delivery metrics, open/click tracking. See `ROADMAP.md`.
+Still open: aggregate delivery trends and broader Phase 6 administration features. See `ROADMAP.md`.
 
 **Phase 4 — Campaigns & Resend** (COMPLETE)
 
@@ -137,7 +137,7 @@ No server-side secrets are stored in the database or exposed to the frontend bun
 
 These are the remaining items before the roadmap is fully complete — see `ROADMAP.md` and `HANDOFF.md` for details:
 
-- No open/click tracking
+- No aggregate delivery trends over time
 - No suppression-list *UI* beyond the inline reason/bounce-count note on the subscribers table (auto-suppression itself is now handled by the webhook)
 - No role-based access control — every authenticated user is a full admin
 - No admin user provisioning UI (Supabase dashboard/SQL only)

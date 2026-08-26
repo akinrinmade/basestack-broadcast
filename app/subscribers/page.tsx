@@ -308,6 +308,14 @@ export default function SubscribersPage() {
                   {f}
                 </button>
               ))}
+              <button
+                onClick={() => setStatusFilter('suppressed')}
+                className={`rounded-lg px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide transition ${
+                  statusFilter === 'suppressed' ? 'bg-destructive text-destructive-foreground' : 'bg-destructive/10 text-destructive hover:bg-destructive/20'
+                }`}
+              >
+                Suppression list
+              </button>
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />

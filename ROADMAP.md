@@ -52,8 +52,7 @@
 
 **Still open:**
 - Delivery metrics beyond sent/failed counts
-- Open/click tracking
-- A dedicated suppression-list view (currently just visible inline in the main subscribers table)
+- Aggregate delivery trends over time
 
 ## Phase 6 — Polish (NOT STARTED)
 - Dashboard charts and trends

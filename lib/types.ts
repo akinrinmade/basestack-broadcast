@@ -119,4 +119,8 @@ export interface CampaignSend {
   error: string | null
   resend_id: string | null
   sent_at: string
+  opened_at: string | null
+  clicked_at: string | null
+  open_count: number
+  click_count: number
 }

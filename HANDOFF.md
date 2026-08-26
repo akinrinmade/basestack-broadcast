@@ -74,7 +74,7 @@ IN PROGRESS. Rate limiting, bounce/complaint webhook, and CSV export are done. N
 - `NEXT_PUBLIC_APP_URL` (optional but recommended once deployed, so confirm/unsubscribe links don't depend on request origin)
 - `RESEND_WEBHOOK_SECRET` — without this, `/api/webhooks/resend` returns 503 and bounces/complaints are never processed
 
-**Migration not yet applied:** `0004_create_rate_limits.sql` needs to be run against Supabase before rate limiting will work — without the table, `/api/subscribe` will error on the rate-limit check.
+**Migrations not yet applied:** `0004_create_rate_limits.sql` and `0005_add_campaign_engagement.sql` need to be run against Supabase before rate limiting and engagement metrics work.
 
 ## Known Issues
 - No admin user provisioning UI — admin users must be created via Supabase dashboard or SQL.

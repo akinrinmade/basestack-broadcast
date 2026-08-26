@@ -47,7 +47,11 @@ export async function POST(request: Request) {
 
   let event: {
     type?: string
-    data?: { to?: string | string[]; bounce?: { type?: string } }
+    data?: {
+      email_id?: string
+      to?: string | string[]
+      bounce?: { type?: string }
+    }
   }
   try {
     event = JSON.parse(rawBody)
@@ -58,7 +62,43 @@ export async function POST(request: Request) {
   const type = event.type
   const data = event.data ?? {}
 
-  // Events we care about; everything else (delivered, opened, clicked, ...)
+  if (type === 'email.opened' || type === 'email.clicked') {
+    if (!data.email_id) {
+      return NextResponse.json({ ok: true, ignored: true, note: 'No email id in payload.' })
+    }
+
+    const column = type === 'email.opened' ? 'open_count' : 'click_count'
+    const timestampColumn = type === 'email.opened' ? 'opened_at' : 'clicked_at'
+    const admin = getSupabaseAdmin()
+    const { data: send } = await admin
+      .from('campaign_sends')
+      .select(`id, ${column}`)
+      .eq('resend_id', data.email_id)
+      .maybeSingle()
+
+    if (!send) {
+      return NextResponse.json({ ok: true, ignored: true, note: 'No matching campaign send.' })
+    }
+
+    const currentCount = (send as Record<string, unknown>)[column] as number | null | undefined
+
+    const { error } = await admin
+      .from('campaign_sends')
+      .update({
+        [column]: (currentCount ?? 0) + 1,
+        [timestampColumn]: new Date().toISOString(),
+      })
+      .eq('id', send.id)
+
+    if (error) {
+      console.error('[webhooks/resend] failed to record engagement', error)
+      return NextResponse.json({ error: 'Failed to record event.' }, { status: 500 })
+    }
+
+    return NextResponse.json({ ok: true, recorded: type })
+  }
+
+  // Events we care about; everything else (delivered, ...)
   // is acknowledged and ignored so Resend doesn't retry it as a failure.
   if (type !== 'email.bounced' && type !== 'email.complained') {
     return NextResponse.json({ ok: true, ignored: true })
