@@ -77,7 +77,7 @@ IN PROGRESS. Core Phase 6 features are implemented. Production activation still 
 - `NEXT_PUBLIC_APP_URL` (optional but recommended once deployed, so confirm/unsubscribe links don't depend on request origin)
 - `RESEND_WEBHOOK_SECRET` — without this, `/api/webhooks/resend` returns 503 and bounces/complaints are never processed
 
-**Migrations not yet applied:** `0004_create_rate_limits.sql`, `0005_add_campaign_engagement.sql`, and `0006_team_roles_audit.sql` need to be run against Supabase before the related features work.
+**Migrations not yet applied:** `0004_create_rate_limits.sql`, `0005_add_campaign_engagement.sql`, `0006_team_roles_audit.sql`, and `0007_remove_legacy_rbac_policies.sql` need to be run against Supabase before the related features work. Migration `0007` is required to remove legacy policies that would bypass role checks.
 
 ## Known Issues
 - No admin user provisioning UI — admin users must be created via Supabase dashboard or SQL.

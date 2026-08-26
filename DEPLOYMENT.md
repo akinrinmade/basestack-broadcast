@@ -4,7 +4,7 @@ The application code is ready, but production activation requires access to Supa
 
 ## Supabase
 
-Run migrations `0001` through `0006` in order in the Supabase SQL editor or with the Supabase CLI. Migration `0006` seeds existing users as admins; review `team_members` afterward and reduce access where needed.
+Run migrations `0001` through `0007` in order in the Supabase SQL editor or with the Supabase CLI. Migration `0006` seeds existing users as admins; review `team_members` afterward and reduce access where needed. Migration `0007` removes legacy authenticated-only policies so RBAC cannot be bypassed.
 
 ## Vercel environment variables
 
