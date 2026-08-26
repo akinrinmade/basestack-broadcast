@@ -78,20 +78,24 @@ export async function POST(request: Request) {
     const appUrl = getAppUrl(request)
     const recipientName = escapeHtml(subscriber.name || 'there')
     const unsubscribeUrl = `${appUrl}/unsubscribe?token=${subscriber.unsubscribe_token}`
+    const { data: settings } = await admin
+      .from('settings')
+      .select('welcome_subject, welcome_html, mailing_address')
+      .eq('id', 1)
+      .maybeSingle()
+    const welcomeSubject = settings?.welcome_subject || 'Welcome to Basestack Academy'
+    const welcomeBody = (settings?.welcome_html || '<h2>Welcome to Basestack Academy</h2><p>Hi {{name}},</p><p>Thanks for confirming your subscription.</p>')
+      .replace(/\{\{\s*name\s*\}\}/gi, recipientName)
     const html = buildCampaignHtml({
-      bodyHtml: `
-        <h2 style="margin:0 0 16px;">Welcome to Basestack Academy</h2>
-        <p style="margin:0 0 16px;">Hi ${recipientName},</p>
-        <p style="margin:0 0 20px;">Thanks for confirming your subscription. You are now on the list for updates, news, and useful resources from Basestack Academy.</p>
-        <p style="margin:0;">We are glad to have you here.</p>
-      `,
+      bodyHtml: welcomeBody,
       unsubscribeUrl,
+      mailingAddress: settings?.mailing_address,
     })
 
     try {
       const result = await sendEmail({
         to: subscriber.email,
-        subject: 'Welcome to Basestack Academy',
+        subject: welcomeSubject,
         html,
         from: getDefaultFromAddress('Basestack Academy'),
       })

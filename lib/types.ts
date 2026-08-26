@@ -30,6 +30,8 @@ export interface Settings {
   sender_name: string
   reply_to_email: string | null
   mailing_address: string | null
+  welcome_subject: string
+  welcome_html: string
   updated_at: string
 }
 
@@ -37,6 +39,8 @@ export interface SettingsInput {
   sender_name: string
   reply_to_email: string | null
   mailing_address: string | null
+  welcome_subject: string
+  welcome_html: string
 }
 
 export interface DashboardStats {

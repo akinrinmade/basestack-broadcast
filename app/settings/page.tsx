@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Check, Settings2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Bold, Check, ImagePlus, Italic, Link as LinkIcon, Settings2, Underline } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
 import { ProtectedRoute } from '@/components/protected-route'
 import { Button } from '@/components/ui/button'
 import { fetchSettings, saveSettings } from '@/lib/settings'
+import { supabase } from '@/lib/supabase/client'
 import type { Settings } from '@/lib/types'
 
 export default function SettingsPage() {
@@ -13,7 +14,17 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [form, setForm] = useState({ sender_name: '', reply_to_email: '', mailing_address: '' })
+  const [form, setForm] = useState({
+    sender_name: '',
+    reply_to_email: '',
+    mailing_address: '',
+    welcome_subject: '',
+    welcome_html: '',
+  })
+  const editorRef = useRef<HTMLDivElement>(null)
+  const mediaInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingMedia, setUploadingMedia] = useState(false)
+  const [mediaError, setMediaError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
@@ -26,7 +37,10 @@ export default function SettingsPage() {
           sender_name: s.sender_name,
           reply_to_email: s.reply_to_email ?? '',
           mailing_address: s.mailing_address ?? '',
+          welcome_subject: s.welcome_subject ?? 'Welcome to Basestack Academy',
+          welcome_html: s.welcome_html ?? '',
         })
+        if (editorRef.current) editorRef.current.innerHTML = s.welcome_html ?? ''
         setError(null)
       })
       .catch((e: Error) => setError(e.message))
@@ -60,6 +74,8 @@ export default function SettingsPage() {
         sender_name: form.sender_name.trim(),
         reply_to_email: form.reply_to_email.trim() || null,
         mailing_address: form.mailing_address.trim() || null,
+        welcome_subject: form.welcome_subject.trim() || 'Welcome to Basestack Academy',
+        welcome_html: form.welcome_html.trim(),
       })
       setSettings(updated)
       setSaved(true)
@@ -68,6 +84,41 @@ export default function SettingsPage() {
       setSaveError((e as Error).message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  function formatWelcome(command: string, value?: string) {
+    editorRef.current?.focus()
+    document.execCommand(command, false, value)
+    setForm((current) => ({ ...current, welcome_html: editorRef.current?.innerHTML ?? '' }))
+  }
+
+  async function uploadWelcomeImage(file: File | undefined) {
+    if (!file) return
+    setMediaError(null)
+    if (!file.type.startsWith('image/')) {
+      setMediaError('Please choose an image file.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMediaError('Images must be 5 MB or smaller.')
+      return
+    }
+    setUploadingMedia(true)
+    try {
+      const path = `campaign-media/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`
+      const { error } = await supabase.storage.from('campaign-media').upload(path, file, {
+        contentType: file.type,
+        upsert: false,
+      })
+      if (error) throw new Error(error.message)
+      const { data } = supabase.storage.from('campaign-media').getPublicUrl(path)
+      formatWelcome('insertHTML', `<p><img src="${data.publicUrl}" alt="${file.name.replace(/"/g, '')}" style="max-width:100%;height:auto;" /></p>`)
+    } catch (e) {
+      setMediaError((e as Error).message)
+    } finally {
+      setUploadingMedia(false)
+      if (mediaInputRef.current) mediaInputRef.current.value = ''
     }
   }
 
@@ -116,6 +167,47 @@ export default function SettingsPage() {
                   Required. Display name for outgoing emails.
                 </span>
               </label>
+
+              <div className="flex flex-col gap-4 border-t border-border pt-5">
+                <div>
+                  <h3 className="text-sm font-semibold">Welcome email</h3>
+                  <p className="mt-1 text-xs font-normal text-muted-foreground">
+                    Sent once after a new subscriber confirms. Use {'{{name}}'} for personalization.
+                  </p>
+                </div>
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Subject
+                  <input
+                    className="modal-input"
+                    value={form.welcome_subject}
+                    onChange={(e) => setForm({ ...form, welcome_subject: e.target.value })}
+                    placeholder="Welcome to Basestack Academy"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Message
+                  <div className="overflow-hidden rounded-lg border border-input bg-background">
+                    <div className="flex flex-wrap items-center gap-1 border-b border-border bg-muted/50 p-2">
+                      <WelcomeTool label="Bold" onClick={() => formatWelcome('bold')}><Bold className="size-4" /></WelcomeTool>
+                      <WelcomeTool label="Italic" onClick={() => formatWelcome('italic')}><Italic className="size-4" /></WelcomeTool>
+                      <WelcomeTool label="Underline" onClick={() => formatWelcome('underline')}><Underline className="size-4" /></WelcomeTool>
+                      <WelcomeTool label="Add link" onClick={() => { const url = window.prompt('Paste a link URL'); if (url) formatWelcome('createLink', url) }}><LinkIcon className="size-4" /></WelcomeTool>
+                      <WelcomeTool label="Add image" onClick={() => mediaInputRef.current?.click()} disabled={uploadingMedia}><ImagePlus className="size-4" /></WelcomeTool>
+                      <input ref={mediaInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadWelcomeImage(e.target.files?.[0])} />
+                    </div>
+                    <div
+                      ref={editorRef}
+                      className="welcome-editor min-h-[180px] p-4 text-sm leading-6 outline-none"
+                      contentEditable
+                      data-placeholder="Write your welcome message..."
+                      suppressContentEditableWarning
+                      onInput={(e) => setForm({ ...form, welcome_html: e.currentTarget.innerHTML })}
+                    />
+                  </div>
+                  {uploadingMedia && <span className="text-xs font-normal text-muted-foreground">Uploading image...</span>}
+                  {mediaError && <span className="text-xs font-normal text-destructive">{mediaError}</span>}
+                </label>
+              </div>
 
               <label className="flex flex-col gap-2 text-sm font-medium">
                 Reply-to email
@@ -172,8 +264,31 @@ export default function SettingsPage() {
           :global(.modal-input:focus) {
             box-shadow: 0 0 0 2px var(--primary);
           }
+          :global(.welcome-editor:empty::before) {
+            color: var(--muted-foreground);
+            content: attr(data-placeholder);
+            pointer-events: none;
+          }
         `}</style>
       </ProtectedRoute>
     </AdminShell>
+  )
+}
+
+function WelcomeTool({
+  label,
+  onClick,
+  disabled = false,
+  children,
+}: {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <button type="button" className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-50" title={label} aria-label={label} onMouseDown={(e) => e.preventDefault()} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
   )
 }
