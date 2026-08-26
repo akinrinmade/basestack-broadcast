@@ -23,6 +23,7 @@ export async function saveSettings(input: SettingsInput): Promise<Settings> {
       welcome_html: input.welcome_html,
       confirmation_subject: input.confirmation_subject,
       confirmation_html: input.confirmation_html,
+      email_theme: input.email_theme,
     })
     .eq('id', 1)
     .select()

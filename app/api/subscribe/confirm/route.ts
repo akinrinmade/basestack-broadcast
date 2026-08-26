@@ -90,6 +90,7 @@ export async function POST(request: Request) {
       bodyHtml: welcomeBody,
       unsubscribeUrl,
       mailingAddress: settings?.mailing_address,
+      theme: settings?.email_theme,
     })
 
     try {

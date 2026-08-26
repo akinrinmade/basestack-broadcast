@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 
   const { data: settings } = await admin
     .from('settings')
-    .select('confirmation_subject, confirmation_html, mailing_address')
+    .select('confirmation_subject, confirmation_html, mailing_address, email_theme')
     .eq('id', 1)
     .maybeSingle()
 
@@ -94,6 +94,7 @@ export async function POST(request: Request) {
       bodyHtml: confirmationBody,
       unsubscribeUrl: `${appUrl}/unsubscribe?token=${unsubscribeToken ?? ''}`,
       mailingAddress: settings?.mailing_address,
+      theme: settings?.email_theme,
     })
 
     await sendEmail({

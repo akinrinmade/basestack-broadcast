@@ -158,18 +158,25 @@ export function buildCampaignHtml(options: {
   bodyHtml: string
   unsubscribeUrl: string
   mailingAddress?: string | null
+  theme?: 'clean' | 'sunset' | 'forest' | 'ocean'
 }): string {
-  const { bodyHtml, unsubscribeUrl, mailingAddress } = options
+  const { bodyHtml, unsubscribeUrl, mailingAddress, theme = 'clean' } = options
+  const themes = {
+    clean: { page: '#f4f4f5', card: '#ffffff', text: '#18181b', accent: '#18181b' },
+    sunset: { page: '#fff1e8', card: '#ffffff', text: '#3b1f1a', accent: '#d3542a' },
+    forest: { page: '#edf6ef', card: '#ffffff', text: '#173b2c', accent: '#19734a' },
+    ocean: { page: '#eaf6f8', card: '#ffffff', text: '#12343b', accent: '#087f8c' },
+  } as const
+  const colors = themes[theme]
   return `
 <!doctype html>
-<html>
-  <body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 0;">
+<html><body style="margin:0;padding:0;background:${colors.page};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${colors.page};padding:24px 0;">
       <tr>
         <td align="center">
-          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:${colors.card};border-radius:12px;overflow:hidden;">
             <tr>
-              <td style="padding:32px;color:#18181b;font-size:15px;line-height:1.6;">
+              <td style="padding:32px;color:${colors.text};font-size:15px;line-height:1.6;border-top:6px solid ${colors.accent};">
                 ${bodyHtml}
               </td>
             </tr>
@@ -177,7 +184,7 @@ export function buildCampaignHtml(options: {
               <td style="padding:20px 32px;border-top:1px solid #e4e4e7;color:#71717a;font-size:12px;line-height:1.6;">
                 ${mailingAddress ? `<p style="margin:0 0 8px;">${mailingAddress}</p>` : ''}
                 <p style="margin:0;">
-                  <a href="${unsubscribeUrl}" style="color:#71717a;">Unsubscribe</a> from Basestack Academy broadcasts.
+                  <a href="${unsubscribeUrl}" style="color:${colors.accent};">Unsubscribe</a> from Basestack Academy emails.
                 </p>
               </td>
             </tr>

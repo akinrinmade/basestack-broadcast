@@ -34,6 +34,7 @@ export interface Settings {
   welcome_html: string
   confirmation_subject: string
   confirmation_html: string
+  email_theme: EmailTheme
   updated_at: string
 }
 
@@ -45,7 +46,10 @@ export interface SettingsInput {
   welcome_html: string
   confirmation_subject: string
   confirmation_html: string
+  email_theme: EmailTheme
 }
+
+export type EmailTheme = 'clean' | 'sunset' | 'forest' | 'ocean'
 
 export interface DashboardStats {
   total: number

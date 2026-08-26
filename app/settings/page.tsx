@@ -7,7 +7,7 @@ import { ProtectedRoute } from '@/components/protected-route'
 import { Button } from '@/components/ui/button'
 import { fetchSettings, saveSettings } from '@/lib/settings'
 import { supabase } from '@/lib/supabase/client'
-import type { Settings } from '@/lib/types'
+import type { EmailTheme, Settings } from '@/lib/types'
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -22,6 +22,7 @@ export default function SettingsPage() {
     welcome_html: '',
     confirmation_subject: '',
     confirmation_html: '',
+    email_theme: 'clean' as EmailTheme,
   })
   const editorRef = useRef<HTMLDivElement>(null)
   const confirmationEditorRef = useRef<HTMLDivElement>(null)
@@ -46,6 +47,7 @@ export default function SettingsPage() {
           welcome_html: s.welcome_html ?? '',
           confirmation_subject: s.confirmation_subject ?? 'Confirm your Basestack Academy subscription',
           confirmation_html: s.confirmation_html ?? '',
+          email_theme: s.email_theme ?? 'clean',
         })
         if (editorRef.current) editorRef.current.innerHTML = s.welcome_html ?? ''
         if (confirmationEditorRef.current) confirmationEditorRef.current.innerHTML = s.confirmation_html ?? ''
@@ -86,6 +88,7 @@ export default function SettingsPage() {
         welcome_html: form.welcome_html.trim(),
         confirmation_subject: form.confirmation_subject.trim() || 'Confirm your Basestack Academy subscription',
         confirmation_html: form.confirmation_html.trim(),
+        email_theme: form.email_theme,
       })
       setSettings(updated)
       setSaved(true)
@@ -233,6 +236,26 @@ export default function SettingsPage() {
                 </span>
               </label>
 
+              <div className="flex flex-col gap-3 border-t border-border pt-5">
+                <div>
+                  <h3 className="text-sm font-semibold">Email theme</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">Choose the look used by verification and welcome emails.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {EMAIL_THEMES.map((theme) => (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      className={`rounded-lg border p-2 text-left transition ${form.email_theme === theme.id ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}`}
+                      onClick={() => setForm({ ...form, email_theme: theme.id })}
+                    >
+                      <span className="block h-8 rounded" style={{ background: theme.page, borderTop: `5px solid ${theme.accent}` }} />
+                      <span className="mt-2 block text-xs font-medium">{theme.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex flex-col gap-4 border-t border-border pt-5">
                 <div>
                   <h3 className="text-sm font-semibold">Welcome email</h3>
@@ -273,7 +296,7 @@ export default function SettingsPage() {
                   </div>
                   {uploadingMedia && <span className="text-xs font-normal text-muted-foreground">Uploading image...</span>}
                   {mediaError && <span className="text-xs font-normal text-destructive">{mediaError}</span>}
-                  {previewTemplate === 'welcome' && <TemplatePreview html={form.welcome_html} name="there" />}
+                  {previewTemplate === 'welcome' && <TemplatePreview html={form.welcome_html} name="there" theme={form.email_theme} />}
                 </label>
               </div>
 
@@ -302,7 +325,7 @@ export default function SettingsPage() {
                     </div>
                     <div ref={confirmationEditorRef} className="welcome-editor min-h-[180px] p-4 text-sm leading-6 outline-none" contentEditable data-placeholder="Write your verification message..." suppressContentEditableWarning onPaste={handleConfirmationPaste} onInput={(e) => setForm({ ...form, confirmation_html: e.currentTarget.innerHTML })} />
                   </div>
-                  {previewTemplate === 'confirmation' && <TemplatePreview html={form.confirmation_html} name="there" />}
+                  {previewTemplate === 'confirmation' && <TemplatePreview html={form.confirmation_html} name="there" theme={form.email_theme} />}
                 </label>
               </div>
 
@@ -403,12 +426,20 @@ function extractPastedHtml(text: string): string {
     .trim()
 }
 
-function TemplatePreview({ html, name }: { html: string; name: string }) {
+const EMAIL_THEMES: { id: EmailTheme; label: string; page: string; accent: string }[] = [
+  { id: 'clean', label: 'Clean', page: '#f4f4f5', accent: '#18181b' },
+  { id: 'sunset', label: 'Sunset', page: '#fff1e8', accent: '#d3542a' },
+  { id: 'forest', label: 'Forest', page: '#edf6ef', accent: '#19734a' },
+  { id: 'ocean', label: 'Ocean', page: '#eaf6f8', accent: '#087f8c' },
+]
+
+function TemplatePreview({ html, name, theme }: { html: string; name: string; theme: EmailTheme }) {
   const rendered = html.replace(/\{\{\s*name\s*\}\}/gi, name).replace(/\{\{\s*confirm_url\s*\}\}/gi, 'https://example.com/confirm')
+  const selectedTheme = EMAIL_THEMES.find((item) => item.id === theme) ?? EMAIL_THEMES[0]
   return (
-    <div className="mt-3 overflow-hidden rounded-lg border border-border bg-white">
+    <div className="mt-3 overflow-hidden rounded-lg border border-border p-3" style={{ background: selectedTheme.page }}>
       <div className="border-b border-border bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">Live email preview</div>
-      <div className="max-h-80 overflow-y-auto p-4" dangerouslySetInnerHTML={{ __html: rendered || '<p style="color:#71717a;">Nothing to preview yet.</p>' }} />
+      <div className="mx-auto mt-3 max-h-80 max-w-xl overflow-y-auto rounded-lg border-t-4 bg-white p-5" style={{ borderColor: selectedTheme.accent }} dangerouslySetInnerHTML={{ __html: rendered || '<p style="color:#71717a;">Nothing to preview yet.</p>' }} />
     </div>
   )
 }
