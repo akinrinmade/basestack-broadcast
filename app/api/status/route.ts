@@ -10,8 +10,10 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     emailDeliveryConfigured: checkResendConfig() === null,
-    // Scheduled sending has no cron/worker infrastructure yet — `campaigns.scheduled_at`
-    // exists so campaigns can be marked "scheduled", but nothing currently picks them up.
-    scheduledJobsConfigured: false,
+    // The cron route at /api/cron/send-scheduled picks up due campaigns, but it
+    // refuses to run without CRON_SECRET set (see that route for why). Treat
+    // "configured" as "the secret exists", since that's the one manual setup
+    // step Vercel Cron itself can't do for you.
+    scheduledJobsConfigured: Boolean(process.env.CRON_SECRET),
   })
 }
