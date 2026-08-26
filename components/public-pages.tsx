@@ -17,9 +17,23 @@ function PublicFrame({ children }: { children: React.ReactNode }) {
 export function PublicSubscribe({
   mode = 'subscribe',
 }: {
-  mode?: 'subscribe' | 'confirmed' | 'unsubscribe'
+  mode?: 'subscribe' | 'confirm' | 'confirmed' | 'unsubscribe'
 }) {
-  const [submitted, setSubmitted] = useState(mode !== 'subscribe')
+  const [submitted, setSubmitted] = useState(mode !== 'subscribe' && mode !== 'confirm')
+
+  if (mode === 'confirm')
+    return (
+      <PublicFrame>
+        <Activity className="size-6 text-primary" />
+        <h1 className="mt-5 text-3xl font-semibold tracking-tight">Confirm your subscription</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          One last step. Confirm below to start receiving Basestack Academy broadcasts.
+        </p>
+        <Button className="mt-7 w-full" onClick={() => setSubmitted(true)}>
+          {submitted ? 'Confirmed' : 'Confirm subscription'}
+        </Button>
+      </PublicFrame>
+    )
 
   if (mode === 'confirmed')
     return (
