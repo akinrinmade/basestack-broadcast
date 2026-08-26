@@ -6,6 +6,7 @@ import Link from 'next/link'
 import {
   Bold,
   Calendar,
+  Eraser,
   Eye,
   ImagePlus,
   Italic,
@@ -13,12 +14,17 @@ import {
   List,
   ListOrdered,
   Quote,
+  Redo2,
   Save,
   Send,
   TestTube2,
+  Undo2,
   Underline,
   Users,
   X,
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
 } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
 import { ProtectedRoute } from '@/components/protected-route'
@@ -434,6 +440,13 @@ function ComposeContent() {
           <Field label="Email content">
             <div className="overflow-hidden rounded-lg border border-input bg-background">
               <div className="flex flex-wrap items-center gap-1 border-b border-border bg-muted/50 p-2">
+                <EditorButton label="Undo" onClick={() => runEditorCommand('undo')} disabled={isLocked}>
+                  <Undo2 className="size-4" />
+                </EditorButton>
+                <EditorButton label="Redo" onClick={() => runEditorCommand('redo')} disabled={isLocked}>
+                  <Redo2 className="size-4" />
+                </EditorButton>
+                <span className="mx-1 h-5 w-px bg-border" />
                 <EditorButton label="Bold" onClick={() => runEditorCommand('bold')} disabled={isLocked}>
                   <Bold className="size-4" />
                 </EditorButton>
@@ -464,6 +477,16 @@ function ComposeContent() {
                 <EditorButton label="Quote" onClick={() => runEditorCommand('formatBlock', 'blockquote')} disabled={isLocked}>
                   <Quote className="size-4" />
                 </EditorButton>
+                <span className="mx-1 h-5 w-px bg-border" />
+                <EditorButton label="Align left" onClick={() => runEditorCommand('justifyLeft')} disabled={isLocked}>
+                  <AlignLeft className="size-4" />
+                </EditorButton>
+                <EditorButton label="Align center" onClick={() => runEditorCommand('justifyCenter')} disabled={isLocked}>
+                  <AlignCenter className="size-4" />
+                </EditorButton>
+                <EditorButton label="Align right" onClick={() => runEditorCommand('justifyRight')} disabled={isLocked}>
+                  <AlignRight className="size-4" />
+                </EditorButton>
                 <EditorButton
                   label="Add link"
                   onClick={() => {
@@ -473,6 +496,23 @@ function ComposeContent() {
                   disabled={isLocked}
                 >
                   <LinkIcon className="size-4" />
+                </EditorButton>
+                <label
+                  className="flex size-8 cursor-pointer items-center justify-center rounded text-muted-foreground hover:bg-background hover:text-foreground has-[:disabled]:opacity-50"
+                  title="Text color"
+                >
+                  <span className="flex size-4 items-end justify-center border-b-4 border-primary text-xs font-bold">A</span>
+                  <input
+                    type="color"
+                    className="sr-only"
+                    aria-label="Text color"
+                    defaultValue="#18181b"
+                    onChange={(e) => runEditorCommand('foreColor', e.target.value)}
+                    disabled={isLocked}
+                  />
+                </label>
+                <EditorButton label="Clear formatting" onClick={() => runEditorCommand('removeFormat')} disabled={isLocked}>
+                  <Eraser className="size-4" />
                 </EditorButton>
                 <EditorButton label="Add image" onClick={() => mediaInputRef.current?.click()} disabled={isLocked || uploadingMedia}>
                   <ImagePlus className="size-4" />
