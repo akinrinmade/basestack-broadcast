@@ -1,4 +1,4 @@
-import type { CsvPreview, CsvRow } from '@/lib/types'
+import type { CsvPreview, CsvRow, Subscriber } from '@/lib/types'
 import { checkEmailsExist } from '@/lib/subscribers'
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
@@ -45,6 +45,56 @@ export function parseCsv(text: string): { name: string; email: string }[] {
   }
 
   return rows
+}
+
+/** Quotes a CSV field only when needed, doubling any embedded quotes per RFC 4180. */
+function csvField(value: string | number | null | undefined): string {
+  const str = value === null || value === undefined ? '' : String(value)
+  if (/[",\n\r]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`
+  }
+  return str
+}
+
+/**
+ * Builds a CSV export of the given subscribers. Includes enough fields to
+ * be genuinely useful for backup/analysis (status, source, suppression
+ * reason, bounce count, timestamps) without exposing the confirm/
+ * unsubscribe tokens, which are sensitive (they grant unauthenticated
+ * write access to that subscriber's status).
+ */
+export function exportSubscribersToCsv(subscribers: Subscriber[]): string {
+  const header = [
+    'name',
+    'email',
+    'status',
+    'source',
+    'suppression_reason',
+    'bounce_count',
+    'confirmed_at',
+    'unsubscribed_at',
+    'created_at',
+  ]
+
+  const lines = [header.join(',')]
+
+  for (const s of subscribers) {
+    lines.push(
+      [
+        csvField(s.name),
+        csvField(s.email),
+        csvField(s.status),
+        csvField(s.source),
+        csvField(s.suppression_reason),
+        csvField(s.bounce_count),
+        csvField(s.confirmed_at),
+        csvField(s.unsubscribed_at),
+        csvField(s.created_at),
+      ].join(','),
+    )
+  }
+
+  return lines.join('\r\n')
 }
 
 function parseCsvLine(line: string): string[] {

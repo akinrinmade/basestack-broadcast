@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { buildCampaignHtml, getDefaultFromAddress, sendEmail } from '@/lib/resend'
+import { checkRateLimit, getClientIp } from '@/lib/server/rate-limit'
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
+// This is a public, unauthenticated endpoint — cap it per-IP so it can't be
+// used to spam-create pending subscribers or flood confirmation emails.
+const SUBSCRIBE_RATE_LIMIT_MAX = 5
+const SUBSCRIBE_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000
 
 function getAppUrl(request: Request): string {
   const configured = process.env.NEXT_PUBLIC_APP_URL
@@ -11,6 +17,19 @@ function getAppUrl(request: Request): string {
 }
 
 export async function POST(request: Request) {
+  const ip = getClientIp(request)
+  const rateLimit = await checkRateLimit(
+    `subscribe:${ip}`,
+    SUBSCRIBE_RATE_LIMIT_MAX,
+    SUBSCRIBE_RATE_LIMIT_WINDOW_MS,
+  )
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many signup attempts. Please try again shortly.' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds ?? 60) } },
+    )
+  }
+
   let body: { name?: string; email?: string }
   try {
     body = await request.json()
@@ -50,7 +69,7 @@ export async function POST(request: Request) {
   } else {
     const { data: inserted, error } = await admin
       .from('subscribers')
-      .insert({ email, name, status: 'pending', source: 'public_signup' })
+      .insert({ email, name, status: 'pending', source: 'public_signup', signup_ip: ip })
       .select('confirm_token, unsubscribe_token')
       .single()
     if (error) return NextResponse.json({ error: 'Could not create your subscription.' }, { status: 500 })

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowUpRight, Check, Clock3, FileUp, MoveHorizontal as MoreHorizontal, Pencil, Plus, Search, ShieldCheck, Trash2, Upload, Users, X } from 'lucide-react'
+import { ArrowUpRight, Check, Clock3, Download, FileUp, MoveHorizontal as MoreHorizontal, Pencil, Plus, Search, ShieldCheck, Trash2, Upload, Users, X } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
 import { ProtectedRoute } from '@/components/protected-route'
 import { Badge } from '@/components/ui/badge'
@@ -13,7 +13,7 @@ import {
   deleteSubscriber,
   bulkCreateSubscribers,
 } from '@/lib/subscribers'
-import { parseCsv, validateCsv } from '@/lib/csv'
+import { parseCsv, validateCsv, exportSubscribersToCsv } from '@/lib/csv'
 import type { Subscriber, SubscriberStatus, CsvPreview } from '@/lib/types'
 
 const STATUS_FILTERS: ('all' | SubscriberStatus)[] = [
@@ -207,6 +207,22 @@ export default function SubscribersPage() {
     }
   }
 
+  function handleExport() {
+    // Exports whatever is currently visible (respects the search query and
+    // status filter), so "export active subscribers" is just filter + export.
+    const csv = exportSubscribersToCsv(shown)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const datestamp = new Date().toISOString().slice(0, 10)
+    a.href = url
+    a.download = `subscribers-${datestamp}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   async function handleCsvImport() {
     if (!csvPreview || csvPreview.validRows.length === 0) return
     setCsvLoading(true)
@@ -234,6 +250,15 @@ export default function SubscribersPage() {
             Manage consent, audiences, and subscriber health.
           </p>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={handleExport}
+              disabled={shown.length === 0}
+            >
+              <Download className="size-4" />
+              Export CSV
+            </Button>
             <Button variant="outline" className="gap-2" onClick={() => setShowCsv(true)}>
               <Upload className="size-4" />
               Import CSV
@@ -371,6 +396,12 @@ export default function SubscribersPage() {
                         >
                           {s.status}
                         </Badge>
+                        {s.status === 'suppressed' && s.suppression_reason && (
+                          <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                            {s.suppression_reason.replace('_', ' ')}
+                            {s.bounce_count > 0 ? ` · ${s.bounce_count} bounce${s.bounce_count === 1 ? '' : 's'}` : ''}
+                          </p>
+                        )}
                       </td>
                       <td className="px-5 py-4 font-mono text-xs text-muted-foreground">
                         {formatDate(s.created_at)}
