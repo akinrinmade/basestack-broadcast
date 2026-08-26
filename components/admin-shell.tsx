@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Activity, Bell, LayoutDashboard, Mail, Menu, MoveHorizontal as MoreHorizontal, Search, Send, Settings2, Users, X } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Activity, Bell, LayoutDashboard, LogOut, Mail, Menu, MoveHorizontal as MoreHorizontal, Search, Send, Settings2, Users, X } from 'lucide-react'
+import { useAuth } from '@/components/auth-provider'
 
 const nav = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -36,7 +37,16 @@ function StatusDot({ color = 'bg-primary' }: { color?: string }) {
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, signOut } = useAuth()
   const [open, setOpen] = useState(false)
+
+  const userInitials = user?.email?.slice(0, 2).toUpperCase() ?? 'AD'
+
+  async function handleSignOut() {
+    await signOut()
+    router.replace('/login')
+  }
 
   const currentLabel =
     nav.find((n) => n.href === pathname)?.label ??
@@ -94,15 +104,21 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </Link>
             <div className="mt-5 flex items-center gap-3 rounded-lg bg-muted/60 p-3">
               <div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-                SC
+                {userInitials}
               </div>
-              <div className="min-w-0">
-                <p className="truncate text-xs font-medium">Sam Carter</p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium">{user?.email ?? 'Admin'}</p>
                 <p className="truncate font-mono text-[10px] text-muted-foreground">
-                  admin@basestack.io
+                  Authenticated
                 </p>
               </div>
-              <MoreHorizontal className="ml-auto size-4 text-muted-foreground" />
+              <button
+                onClick={handleSignOut}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Sign out"
+              >
+                <LogOut className="size-4" />
+              </button>
             </div>
           </div>
         </aside>
@@ -122,7 +138,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                   Broadcast / {currentLabel}
                 </p>
                 <h1 className="text-lg font-semibold tracking-tight">
-                  {currentLabel === 'Dashboard' ? 'Good morning, Sam' : currentLabel}
+                  {currentLabel === 'Dashboard' ? 'Good morning' : currentLabel}
                 </h1>
               </div>
             </div>

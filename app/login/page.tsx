@@ -1,9 +1,41 @@
 'use client'
 
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Activity, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/components/auth-provider'
 
 export default function LoginPage() {
+  const { signIn, user, loading: authLoading } = useAuth()
+  const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/')
+    }
+  }, [authLoading, user, router])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+    const { error } = await signIn(email.trim(), password)
+    if (error) {
+      setError(
+        error.includes('Invalid login credentials')
+          ? 'Invalid email or password.'
+          : error,
+      )
+      setLoading(false)
+    }
+    // On success, onAuthStateChange + useEffect will redirect
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 p-5">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-7 shadow-sm sm:p-10">
@@ -26,32 +58,42 @@ export default function LoginPage() {
         </div>
         <h1 className="mt-5 text-2xl font-semibold tracking-tight">Admin sign in</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Authentication will be implemented in Phase 2. For now, the admin console is accessible
-          without sign-in during development.
+          Sign in to manage subscribers and broadcast settings.
         </p>
 
-        <form className="mt-7 flex flex-col gap-3" onSubmit={(e) => e.preventDefault()}>
+        <form className="mt-7 flex flex-col gap-3" onSubmit={handleSubmit}>
           <input
             type="email"
+            required
             className="rounded-lg border border-input bg-background px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary"
             placeholder="admin@basestack.io"
             aria-label="Email address"
-            disabled
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={loading}
           />
           <input
             type="password"
+            required
             className="rounded-lg border border-input bg-background px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary"
             placeholder="Password"
             aria-label="Password"
-            disabled
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
           />
-          <Button type="submit" disabled>
-            Sign in
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Signing in...' : 'Sign in'}
           </Button>
         </form>
 
         <p className="mt-5 text-center font-mono text-[10px] text-muted-foreground">
-          Phase 2 — Authentication coming soon
+          Basestack Academy · Admin access only
         </p>
       </div>
     </main>

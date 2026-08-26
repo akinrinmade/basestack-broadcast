@@ -1,5 +1,47 @@
 # Changelog
 
+## Phase 2 — Authentication + Security (2026-08-26)
+
+### Added
+- Auth context provider (`components/auth-provider.tsx`):
+  - `useAuth()` hook providing `user`, `session`, `loading`, `signIn`, `signOut`
+  - `supabase.auth.getSession()` for initial session load
+  - `onAuthStateChange` subscription for real-time session updates
+- Protected route wrapper (`components/protected-route.tsx`):
+  - Redirects unauthenticated users to `/login`
+  - Loading spinner during auth state resolution
+- Login page rewritten (`app/login/page.tsx`):
+  - Real email/password form via `supabase.auth.signInWithPassword()`
+  - Loading state during sign-in
+  - Error state for invalid credentials
+  - Auto-redirect to `/` if already authenticated
+- Logout button in admin sidebar with `LogOut` icon
+- Auth provider integrated into root layout wrapping all children
+- All protected routes wrapped with `ProtectedRoute`: `/`, `/subscribers`, `/compose`, `/campaigns`, `/settings`
+
+### Changed
+- Admin shell (`components/admin-shell.tsx`):
+  - Sidebar now displays real authenticated user email instead of hardcoded "Sam Carter"
+  - User initials derived from email
+  - Logout button replaces the "more" icon
+  - Greeting no longer hardcodes a name
+- Root layout (`app/layout.tsx`) wraps children in `AuthProvider`
+- RLS policies on `subscribers` and `settings` tightened from `TO anon, authenticated` to `TO authenticated` only
+
+### Security
+- Migration `0002_tighten_rls_authenticated_only`:
+  - Dropped 8 Phase 1 policies granting anon access
+  - Created 8 new policies scoped `TO authenticated` only
+  - Anon role confirmed to have zero database access (SQL verification: 0 rows returned)
+
+### Verified
+- Production build passes (11 routes, 0 errors)
+- Anon SELECT on subscribers returns 0 rows
+- Anon SELECT on settings returns 0 rows
+- All policies scope `TO authenticated` only (confirmed via security posture)
+- No service-role keys or secrets in frontend code
+- Public routes (`/subscribe`, `/subscribe/confirmed`, `/unsubscribe`) remain unprotected and accessible
+
 ## Phase 1 — Foundation (2026-08-26)
 
 ### Added

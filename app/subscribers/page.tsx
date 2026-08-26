@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowUpRight, Check, Clock3, FileUp, MoveHorizontal as MoreHorizontal, Pencil, Plus, Search, ShieldCheck, Trash2, Upload, Users, X } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
+import { ProtectedRoute } from '@/components/protected-route'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -226,6 +227,7 @@ export default function SubscribersPage() {
 
   return (
     <AdminShell>
+      <ProtectedRoute>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <p className="text-sm text-muted-foreground">
@@ -663,6 +665,7 @@ export default function SubscribersPage() {
           box-shadow: 0 0 0 2px var(--primary);
         }
       `}</style>
+      </ProtectedRoute>
     </AdminShell>
   )
 }

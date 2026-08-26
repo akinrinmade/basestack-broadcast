@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { ArrowUpRight, Gauge, Inbox, Send, Users, Clock3, Mail } from 'lucide-react'
 import Link from 'next/link'
 import { AdminShell, StatusDot } from '@/components/admin-shell'
+import { ProtectedRoute } from '@/components/protected-route'
 import { Button } from '@/components/ui/button'
 import { fetchDashboardStats } from '@/lib/subscribers'
 import type { DashboardStats } from '@/lib/types'
@@ -53,6 +54,7 @@ export default function DashboardPage() {
 
   return (
     <AdminShell>
+      <ProtectedRoute>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
@@ -195,6 +197,7 @@ export default function DashboardPage() {
           </>
         )}
       </div>
+      </ProtectedRoute>
     </AdminShell>
   )
 }

@@ -1,68 +1,91 @@
 # Handoff
 
 ## Current Phase
-Phase 1 — Foundation
+Phase 2 — Authentication + Security
 
 ## Status
 COMPLETE
 
 ## Completed Work
-- Supabase client singleton (`lib/supabase/client.ts`)
-- Database migration: `0001_create_subscribers_and_settings`
-  - `subscribers` table with constraints, indexes, email validation, case-insensitive uniqueness
-  - `settings` table (single-row, seeded)
-  - `updated_at` trigger on both tables
-  - RLS enabled with `TO anon, authenticated` policies (Phase 1)
-- TypeScript types (`lib/types.ts`): Subscriber, Settings, DashboardStats, CsvRow, CsvPreview
-- Subscriber CRUD (`lib/subscribers.ts`): fetch, create, update, delete, bulk create, dashboard stats, email existence check
-- Settings persistence (`lib/settings.ts`): fetch, save
-- CSV parsing and validation (`lib/csv.ts`): parse, validate with email format, missing field, duplicate detection (in-CSV and against DB)
-- Admin shell (`components/admin-shell.tsx`): sidebar nav, topbar, responsive layout
-- Dashboard page (`app/page.tsx`): real subscriber counts from database, campaign "not configured" state
-- Subscribers page (`app/subscribers/page.tsx`): full CRUD with modals, search, status filter, CSV import with preview
-- Settings page (`app/settings/page.tsx`): real persistence with validation
-- Shell routes: `/compose`, `/campaigns`, `/login` — truthful "not yet implemented" states
-- Public pages (`components/public-pages.tsx`): subscribe, unsubscribe, confirmed — preserved from v0
-- Old monolithic `broadcast-console.tsx` removed
+
+### Authentication
+- Auth context provider (`components/auth-provider.tsx`) with `useAuth()` hook
+  - `supabase.auth.getSession()` for initial load
+  - `onAuthStateChange` for session updates
+  - `signIn(email, password)` using `signInWithPassword`
+  - `signOut()` using `supabase.auth.signOut()`
+- Login page (`app/login/page.tsx`) — real email/password form with loading and error states
+  - Redirects to `/` on successful login
+  - Redirects away if already authenticated
+- Protected route wrapper (`components/protected-route.tsx`)
+  - Checks auth state, redirects to `/login` if unauthenticated
+  - Shows loading spinner during auth resolution
+- Auth provider integrated into root layout (`app/layout.tsx`)
+- All protected routes wrapped: `/`, `/subscribers`, `/compose`, `/campaigns`, `/settings`
+- Public routes NOT wrapped: `/subscribe`, `/subscribe/confirmed`, `/unsubscribe`
+
+### Security
+- RLS migration `0002_tighten_rls_authenticated_only`:
+  - Dropped all Phase 1 `anon, authenticated` policies
+  - Created `TO authenticated`-only policies for SELECT, INSERT, UPDATE, DELETE on both tables
+  - Anon role confirmed to have zero access (SQL test: anon SELECT returns 0 rows)
+- Admin shell updated with real user email display and logout button
+- No service-role keys or secrets exposed client-side
+
+### Preserved from Phase 1
+- Subscriber CRUD (fetch, create, update, delete, bulk create)
+- CSV import with validation and preview
+- Settings persistence
+- Dashboard with real database metrics
+- All UI/UX, visual design, navigation, cards, badges, modals
 
 ## Database Migrations Created
 1. `0001_create_subscribers_and_settings` — subscribers + settings tables, RLS, constraints, indexes, triggers
+2. `0002_tighten_rls_authenticated_only` — replaced anon policies with authenticated-only policies
 
 ## Tables Currently Available
-- `subscribers` — full CRUD via anon key
-- `settings` — single-row config (id = 1, seeded)
+- `subscribers` — CRUD via authenticated key only
+- `settings` — CRUD via authenticated key only (single-row, id = 1, seeded)
 
 ## RLS Implemented
-- `subscribers`: SELECT, INSERT, UPDATE, DELETE for `anon, authenticated` (Phase 1 — no auth yet)
-- `settings`: SELECT, INSERT, UPDATE, DELETE for `anon, authenticated` (Phase 1 — no auth yet)
+- `subscribers`: SELECT, INSERT, UPDATE, DELETE for `authenticated` only
+- `settings`: SELECT, INSERT, UPDATE, DELETE for `authenticated` only
+- `anon` role: zero access to both tables (verified)
 
 ## Environment Variables Required
 - `NEXT_PUBLIC_SUPABASE_URL` — already in `.env`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — already in `.env`
 
-No server-side secrets required for Phase 1.
+No server-side secrets required for Phase 2.
 
 ## Known Issues
-- RLS policies are permissive (`USING (true)`) because auth is not yet implemented. This MUST be tightened in Phase 2.
-- The admin user profile in the sidebar ("Sam Carter") is hardcoded — will be replaced with real auth user data in Phase 2.
-- Public subscribe/unsubscribe pages are UI-only — they don't write to the database yet.
+- No admin user provisioning UI — admin users must be created via Supabase dashboard or SQL. This is intentional for Phase 2 (single-admin setup).
+- No "forgot password" flow — can be added in a future phase.
+- Public subscribe/unsubscribe pages are still UI-only (no database writes). Phase 3 will implement these with token-based access.
 
 ## Incomplete Functionality
-- Authentication (login is a shell)
 - Public double-opt-in signup (UI exists, no backend)
+- Unsubscribe token verification (UI exists, no backend)
 - Campaign composition and sending
 - Resend email delivery
 - Cron / scheduled jobs
 - Bounce/complaint webhooks
-- Unsubscribe token verification
 - Batch sending
+- Role-based access control (all authenticated users are admins)
+
+## Verification Performed
+1. Production build passes (`npm run build` — 11 routes, 0 errors)
+2. RLS confirmed: `SET ROLE anon; SELECT count(*) FROM subscribers` returns 0
+3. RLS confirmed: `SET ROLE anon; SELECT count(*) FROM settings` returns 0
+4. Security posture verified: all policies scope `TO authenticated` only
+5. No service-role keys in frontend code
 
 ## Next Recommended Job
-**Phase 2 — Authentication**
+**Phase 3 — Public Signup & Double Opt-In**
 
-1. Implement Supabase email/password auth (sign up + sign in)
-2. Build auth context provider for the admin shell
-3. Protect admin routes (redirect to `/login` if not authenticated)
-4. Tighten RLS policies from `TO anon, authenticated` to `TO authenticated` with admin role checks
-5. Replace hardcoded "Sam Carter" profile with real auth user data
-6. Add sign-out functionality
+1. Create a SECURITY DEFINER function for public subscriber insert (anon-safe, writes to subscribers table)
+2. Wire the public `/subscribe` form to insert a `pending` subscriber via that function
+3. Implement confirmation email sending (requires Resend or similar — may need Phase 4 first)
+4. Implement `/subscribe/confirmed` to verify the confirm_token and activate the subscriber
+5. Implement `/unsubscribe` to verify the unsubscribe_token and set status to `unsubscribed`
+6. Add rate limiting on public signup endpoint

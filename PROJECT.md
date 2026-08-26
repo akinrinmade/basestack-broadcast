@@ -6,13 +6,14 @@ Administrators manage subscribers and send broadcast emails. The system is being
 
 ## Current Phase
 
-**Phase 1 — Foundation** (COMPLETE)
+**Phase 2 — Authentication + Security** (COMPLETE)
 
-- Subscriber CRUD against Supabase
-- CSV import with validation and preview
-- Settings persistence
-- Dashboard with real database metrics
-- Supabase integration with RLS
+- Supabase email/password authentication
+- Protected admin routes (redirect to `/login` when unauthenticated)
+- Logout functionality
+- Session persistence across browser refresh
+- RLS tightened to `authenticated`-only (anon has zero database access)
+- All Phase 1 CRUD/settings/CSV import functionality preserved
 
 ## Tech Stack
 
@@ -21,6 +22,7 @@ Administrators manage subscribers and send broadcast emails. The system is being
 - **Styling:** Tailwind CSS v4 + shadcn (base-nova style)
 - **UI Components:** @base-ui/react, lucide-react
 - **Database:** Supabase (PostgreSQL)
+- **Auth:** Supabase Auth (email/password)
 - **Package Manager:** npm
 
 ## Getting Started
@@ -31,16 +33,18 @@ The dev server runs automatically. Dependencies are already installed.
 
 ```
 app/
-  page.tsx                  — Dashboard (real metrics)
-  subscribers/page.tsx      — Subscriber management (CRUD, search, filter, CSV import)
-  compose/page.tsx          — Compose UI shell (future phase)
-  campaigns/page.tsx        — Campaign history shell (future phase)
-  settings/page.tsx         — Settings (real persistence)
-  login/page.tsx            — Login shell (future phase)
+  page.tsx                  — Dashboard (real metrics, protected)
+  subscribers/page.tsx      — Subscriber management (CRUD, search, filter, CSV import, protected)
+  compose/page.tsx          — Compose UI shell (future phase, protected)
+  campaigns/page.tsx        — Campaign history shell (future phase, protected)
+  settings/page.tsx         — Settings (real persistence, protected)
+  login/page.tsx            — Login page (email/password auth)
   subscribe/                — Public subscribe pages
   unsubscribe/               — Public unsubscribe page
 components/
-  admin-shell.tsx           — Admin layout shell (sidebar, topbar)
+  auth-provider.tsx         — Supabase auth context provider
+  protected-route.tsx       — Route guard (redirects to /login if unauthenticated)
+  admin-shell.tsx           — Admin layout shell (sidebar, topbar, logout)
   public-pages.tsx          — Public-facing subscribe/unsubscribe/confirmed components
   ui/
     button.tsx              — Button component (base-ui)
@@ -60,3 +64,11 @@ lib/
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon key (public, client-safe)
 
 No server-side secrets are stored in the database or frontend code.
+
+## Authentication
+
+- Admin signs in at `/login` with email and password via Supabase Auth.
+- Session is stored in cookies and persists across browser refresh.
+- All admin routes (`/`, `/subscribers`, `/compose`, `/campaigns`, `/settings`) are protected.
+- Public routes (`/subscribe`, `/subscribe/confirmed`, `/unsubscribe`) remain accessible without auth.
+- Logout button in the sidebar clears the session and redirects to `/login`.
