@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { getUserFromRequest } from '@/lib/supabase/route-auth'
 import { checkResendConfig } from '@/lib/resend'
 
+// This endpoint reports runtime environment configuration and must never be cached.
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   const user = await getUserFromRequest(request)
   if (!user) {
