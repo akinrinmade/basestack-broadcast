@@ -1,21 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  ArrowUpRight,
-  Check,
-  Clock3,
-  FileUp,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Search,
-  ShieldCheck,
-  Trash2,
-  Upload,
-  Users,
-  X,
-} from 'lucide-react'
+import { ArrowUpRight, Check, Clock3, FileUp, MoveHorizontal as MoreHorizontal, Pencil, Plus, Search, ShieldCheck, Trash2, Upload, Users, X } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

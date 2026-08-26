@@ -3,19 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import {
-  Activity,
-  Bell,
-  LayoutDashboard,
-  Mail,
-  Menu,
-  MoreHorizontal,
-  Search,
-  Send,
-  Settings2,
-  Users,
-  X,
-} from 'lucide-react'
+import { Activity, Bell, LayoutDashboard, Mail, Menu, MoveHorizontal as MoreHorizontal, Search, Send, Settings2, Users, X } from 'lucide-react'
 
 const nav = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard },
