@@ -1,7 +1,18 @@
+'use client'
+
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { PublicSubscribe } from '@/components/public-pages'
 
-export default function UnsubscribePage() {
-  return <PublicSubscribe mode="unsubscribe" />
+function UnsubscribeContent() {
+  const searchParams = useSearchParams()
+  return <PublicSubscribe mode="unsubscribe" token={searchParams.get('token')} />
 }
 
-export const metadata = { title: 'Unsubscribe · Basestack Academy' }
+export default function UnsubscribePage() {
+  return (
+    <Suspense fallback={null}>
+      <UnsubscribeContent />
+    </Suspense>
+  )
+}

@@ -1,0 +1,87 @@
+import { NextResponse } from 'next/server'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
+import { buildCampaignHtml, getDefaultFromAddress, sendEmail } from '@/lib/resend'
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
+function getAppUrl(request: Request): string {
+  const configured = process.env.NEXT_PUBLIC_APP_URL
+  if (configured) return configured.replace(/\/$/, '')
+  return new URL(request.url).origin
+}
+
+export async function POST(request: Request) {
+  let body: { name?: string; email?: string }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
+  }
+
+  const email = body.email?.trim().toLowerCase() ?? ''
+  const name = body.name?.trim() || null
+
+  if (!EMAIL_RE.test(email)) {
+    return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 })
+  }
+
+  const admin = getSupabaseAdmin()
+
+  // Reuse an existing row (including one that previously unsubscribed) rather
+  // than erroring, so re-subscribing "just works" from the visitor's side.
+  const { data: existing } = await admin
+    .from('subscribers')
+    .select('id, status, confirm_token, unsubscribe_token')
+    .eq('email', email)
+    .maybeSingle()
+
+  let confirmToken = existing?.confirm_token
+  let unsubscribeToken = existing?.unsubscribe_token
+
+  if (existing) {
+    if (existing.status === 'active') {
+      return NextResponse.json({ ok: true, alreadyActive: true })
+    }
+    const { error } = await admin
+      .from('subscribers')
+      .update({ status: 'pending', name: name ?? undefined, source: 'public_signup' })
+      .eq('id', existing.id)
+    if (error) return NextResponse.json({ error: 'Could not update your subscription.' }, { status: 500 })
+  } else {
+    const { data: inserted, error } = await admin
+      .from('subscribers')
+      .insert({ email, name, status: 'pending', source: 'public_signup' })
+      .select('confirm_token, unsubscribe_token')
+      .single()
+    if (error) return NextResponse.json({ error: 'Could not create your subscription.' }, { status: 500 })
+    confirmToken = inserted.confirm_token
+    unsubscribeToken = inserted.unsubscribe_token
+  }
+
+  // Best-effort confirmation email — if Resend isn't configured yet, the
+  // subscriber still lands as "pending" and can be confirmed manually later.
+  if (process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL && confirmToken) {
+    const appUrl = getAppUrl(request)
+    const confirmUrl = `${appUrl}/subscribe/confirm?token=${confirmToken}`
+    const html = buildCampaignHtml({
+      bodyHtml: `
+        <h2 style="margin:0 0 16px;">Confirm your subscription</h2>
+        <p style="margin:0 0 20px;">Click below to start receiving Basestack Academy broadcasts.</p>
+        <p style="margin:0 0 20px;">
+          <a href="${confirmUrl}" style="display:inline-block;background:#18181b;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;">Confirm subscription</a>
+        </p>
+        <p style="margin:0;color:#71717a;font-size:12px;">If you didn\u2019t request this, you can ignore this email.</p>
+      `,
+      unsubscribeUrl: `${appUrl}/unsubscribe?token=${unsubscribeToken ?? ''}`,
+    })
+
+    await sendEmail({
+      to: email,
+      subject: 'Confirm your subscription to Basestack Academy',
+      html,
+      from: getDefaultFromAddress('Basestack Academy'),
+    })
+  }
+
+  return NextResponse.json({ ok: true })
+}

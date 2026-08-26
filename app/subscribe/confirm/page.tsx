@@ -1,7 +1,18 @@
+'use client'
+
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { PublicSubscribe } from '@/components/public-pages'
 
-export const metadata = { title: 'Confirm subscription · Basestack Academy' }
+function ConfirmContent() {
+  const searchParams = useSearchParams()
+  return <PublicSubscribe mode="confirm" token={searchParams.get('token')} />
+}
 
 export default function ConfirmPage() {
-  return <PublicSubscribe mode="confirm" />
+  return (
+    <Suspense fallback={null}>
+      <ConfirmContent />
+    </Suspense>
+  )
 }

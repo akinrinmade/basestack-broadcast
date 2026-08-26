@@ -63,3 +63,58 @@ export interface CsvPreview {
   totalValid: number
   totalInvalid: number
 }
+
+// =========================================================
+// Campaigns
+// =========================================================
+
+export type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed' | 'cancelled'
+
+export type RecipientMode = 'all_active' | 'selected'
+
+export interface RecipientFilter {
+  mode: RecipientMode
+  subscriber_ids?: string[]
+}
+
+export interface Campaign {
+  id: string
+  name: string
+  subject: string
+  sender_name: string | null
+  sender_email: string | null
+  reply_to: string | null
+  html_content: string
+  recipient_filter: RecipientFilter
+  status: CampaignStatus
+  recipient_count: number
+  sent_count: number
+  failed_count: number
+  scheduled_at: string | null
+  created_at: string
+  updated_at: string
+  sent_at: string | null
+}
+
+export interface CampaignInput {
+  name: string
+  subject: string
+  sender_name: string | null
+  sender_email: string | null
+  reply_to: string | null
+  html_content: string
+  recipient_filter: RecipientFilter
+}
+
+export type CampaignSendStatus = 'sent' | 'failed'
+
+export interface CampaignSend {
+  id: string
+  campaign_id: string
+  subscriber_id: string | null
+  email: string
+  status: CampaignSendStatus
+  error: string | null
+  resend_id: string | null
+  sent_at: string
+}

@@ -5,9 +5,12 @@ import { ArrowUpRight, Gauge, Inbox, Send, Users, Clock3, Mail } from 'lucide-re
 import Link from 'next/link'
 import { AdminShell, StatusDot } from '@/components/admin-shell'
 import { ProtectedRoute } from '@/components/protected-route'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { authFetchJson } from '@/lib/api-client'
+import { fetchCampaigns } from '@/lib/campaigns'
 import { fetchDashboardStats } from '@/lib/subscribers'
-import type { DashboardStats } from '@/lib/types'
+import type { Campaign, CampaignStatus, DashboardStats } from '@/lib/types'
 
 function Metric({
   label,
@@ -37,20 +40,54 @@ function Metric({
   )
 }
 
+function StatusBadge({ status }: { status: CampaignStatus }) {
+  const tone =
+    status === 'sent'
+      ? 'success'
+      : status === 'failed'
+        ? 'error'
+        : status === 'sending'
+          ? 'warning'
+          : 'default'
+  return <Badge tone={tone}>{status}</Badge>
+}
+
+interface SystemStatus {
+  emailDeliveryConfigured: boolean
+  scheduledJobsConfigured: boolean
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchDashboardStats()
-      .then((s) => {
+  function loadAll() {
+    setLoading(true)
+    setError(null)
+    Promise.all([
+      fetchDashboardStats(),
+      fetchCampaigns().catch(() => [] as Campaign[]),
+      authFetchJson<SystemStatus>('/api/status').catch(() => null),
+    ])
+      .then(([s, c, status]) => {
         setStats(s)
-        setError(null)
+        setCampaigns(c)
+        setSystemStatus(status)
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadAll()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const recentCampaigns = campaigns.slice(0, 5)
+  const nextScheduled = campaigns.find((c) => c.status === 'scheduled')
 
   return (
     <AdminShell>
@@ -86,19 +123,7 @@ export default function DashboardPage() {
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-5">
             <p className="text-sm font-medium text-destructive">Failed to load dashboard data</p>
             <p className="mt-1 font-mono text-[10px] text-muted-foreground">{error}</p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3"
-              onClick={() => {
-                setLoading(true)
-                setError(null)
-                fetchDashboardStats()
-                  .then(setStats)
-                  .catch((e: Error) => setError(e.message))
-                  .finally(() => setLoading(false))
-              }}
-            >
+            <Button variant="outline" size="sm" className="mt-3" onClick={loadAll}>
               Retry
             </Button>
           </div>
@@ -135,27 +160,57 @@ export default function DashboardPage() {
 
             <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
               <section className="rounded-xl border border-border bg-card">
-                <div className="border-b border-border px-5 py-4">
-                  <h2 className="font-semibold">Campaigns</h2>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Campaign sending is not yet configured
-                  </p>
-                </div>
-                <div className="flex flex-col items-center justify-center gap-3 p-12 text-center">
-                  <div className="flex size-12 items-center justify-center rounded-xl bg-muted">
-                    <Mail className="size-6 text-muted-foreground" />
+                <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                  <div>
+                    <h2 className="font-semibold">Campaigns</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {campaigns.length === 0
+                        ? 'No campaigns yet'
+                        : `${campaigns.length} campaign${campaigns.length === 1 ? '' : 's'} total`}
+                    </p>
                   </div>
-                  <p className="text-sm font-medium">No campaigns yet</p>
-                  <p className="max-w-sm text-xs text-muted-foreground">
-                    Campaign composition and Resend email delivery will be implemented in a future
-                    phase. Subscriber management is ready now.
-                  </p>
-                  <Link href="/compose">
-                    <Button variant="outline" size="sm" className="mt-1">
-                      Preview compose UI
+                  <Link href="/campaigns">
+                    <Button variant="outline" size="sm">
+                      View all
                     </Button>
                   </Link>
                 </div>
+
+                {recentCampaigns.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center gap-3 p-12 text-center">
+                    <div className="flex size-12 items-center justify-center rounded-xl bg-muted">
+                      <Mail className="size-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">No campaigns yet</p>
+                    <p className="max-w-sm text-xs text-muted-foreground">
+                      Compose your first broadcast to send it to your Basestack Academy
+                      subscribers.
+                    </p>
+                    <Link href="/compose">
+                      <Button variant="outline" size="sm" className="mt-1">
+                        Compose a campaign
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    {recentCampaigns.map((c) => (
+                      <Link
+                        key={c.id}
+                        href={`/campaigns/${c.id}`}
+                        className="flex items-center justify-between border-b border-border px-5 py-3 last:border-b-0 hover:bg-muted/30"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{c.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {c.subject || 'No subject yet'}
+                          </p>
+                        </div>
+                        <StatusBadge status={c.status} />
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </section>
 
               <section className="rounded-xl border border-border bg-card">
@@ -167,9 +222,17 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex flex-col gap-5 p-5">
                   {[
-                    ['Email delivery', 'Not configured', 'bg-muted-foreground'],
+                    [
+                      'Email delivery',
+                      systemStatus?.emailDeliveryConfigured ? 'Operational' : 'Not configured',
+                      systemStatus?.emailDeliveryConfigured ? 'bg-primary' : 'bg-muted-foreground',
+                    ],
                     ['Subscriber sync', 'Operational', 'bg-primary'],
-                    ['Scheduled jobs', 'Not configured', 'bg-muted-foreground'],
+                    [
+                      'Scheduled jobs',
+                      systemStatus?.scheduledJobsConfigured ? 'Operational' : 'Not configured',
+                      systemStatus?.scheduledJobsConfigured ? 'bg-primary' : 'bg-muted-foreground',
+                    ],
                     ['API health', 'Operational', 'bg-primary'],
                   ].map((row) => (
                     <div className="flex items-center justify-between" key={row[0]}>
@@ -188,7 +251,7 @@ export default function DashboardPage() {
                     </p>
                     <p className="mt-2 flex items-center gap-2 text-sm font-medium">
                       <Clock3 className="size-4 text-muted-foreground" />
-                      No campaigns scheduled
+                      {nextScheduled ? nextScheduled.name : 'No campaigns scheduled'}
                     </p>
                   </div>
                 </div>
