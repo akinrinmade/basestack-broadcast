@@ -71,4 +71,4 @@ These aren't code work — they're configuration/deployment steps needed before 
 - Set `NEXT_PUBLIC_APP_URL` for stable confirm/unsubscribe links
 - Set `SUPABASE_SERVICE_ROLE_KEY` for the server-only API routes
 - Set `RESEND_WEBHOOK_SECRET` and add `/api/webhooks/resend` as a webhook endpoint in the Resend dashboard, or bounces/complaints will never be processed
-- Confirm your Supabase anon key env var is actually named `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — that's what the code reads (a longstanding docs/code naming mismatch, now corrected here)
+- Confirm your Supabase  anon key env var is actually named `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — that's what the code reads (a longstanding docs/code naming mismatch, now corrected here)
