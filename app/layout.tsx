@@ -5,6 +5,7 @@ import type { Metadata, Viewport } from 'next'
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 import { AuthProvider } from '@/components/auth-provider'
+import { AppThemeProvider } from '@/components/app-theme-provider'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -46,9 +47,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="bg-background">
       <body className={`${geist.variable} ${geistMono.variable} antialiased`}>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <AppThemeProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </AppThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

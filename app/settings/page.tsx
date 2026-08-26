@@ -7,6 +7,7 @@ import { ProtectedRoute } from '@/components/protected-route'
 import { Button } from '@/components/ui/button'
 import { fetchSettings, saveSettings } from '@/lib/settings'
 import { supabase } from '@/lib/supabase/client'
+import { applyAppTheme, type AppTheme } from '@/components/app-theme-provider'
 import type { EmailTheme, Settings } from '@/lib/types'
 
 export default function SettingsPage() {
@@ -34,8 +35,11 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [appTheme, setAppTheme] = useState<AppTheme>('studio')
 
   useEffect(() => {
+    const storedTheme = window.localStorage.getItem('basestack-app-theme') as AppTheme | null
+    if (storedTheme) setAppTheme(storedTheme)
     fetchSettings()
       .then((s) => {
         setSettings(s)
@@ -223,6 +227,20 @@ export default function SettingsPage() {
 
           {!loading && !error && (
             <form onSubmit={handleSave} className="mt-8 flex flex-col gap-5">
+              <div className="flex flex-col gap-3 border-b border-border pb-5">
+                <div>
+                  <h3 className="text-sm font-semibold">App theme</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">Choose the look of your dashboard. This is saved in this browser.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {APP_THEMES.map((theme) => (
+                    <button key={theme.id} type="button" className={`rounded-lg border p-2 text-left transition ${appTheme === theme.id ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}`} onClick={() => { setAppTheme(theme.id); applyAppTheme(theme.id) }}>
+                      <span className="block h-8 rounded" style={{ background: theme.background, borderBottom: `5px solid ${theme.accent}` }} />
+                      <span className="mt-2 block text-xs font-medium">{theme.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
               <label className="flex flex-col gap-2 text-sm font-medium">
                 Sender name
                 <input
@@ -394,6 +412,13 @@ export default function SettingsPage() {
     </AdminShell>
   )
 }
+
+const APP_THEMES: { id: AppTheme; label: string; background: string; accent: string }[] = [
+  { id: 'studio', label: 'Studio', background: '#ffffff', accent: '#18181b' },
+  { id: 'paper', label: 'Paper', background: '#f4f0e8', accent: '#916437' },
+  { id: 'mint', label: 'Mint', background: '#eaf5ef', accent: '#27845b' },
+  { id: 'coral', label: 'Coral', background: '#faeee8', accent: '#d65b32' },
+]
 
 function WelcomeTool({
   label,
