@@ -1,9 +1,25 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Calendar, Eye, Save, Send, TestTube2, Users, X } from 'lucide-react'
+import {
+  Bold,
+  Calendar,
+  Eye,
+  ImagePlus,
+  Italic,
+  Link as LinkIcon,
+  List,
+  ListOrdered,
+  Quote,
+  Save,
+  Send,
+  TestTube2,
+  Underline,
+  Users,
+  X,
+} from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
 import { ProtectedRoute } from '@/components/protected-route'
 import { Button } from '@/components/ui/button'
@@ -18,6 +34,7 @@ import {
 } from '@/lib/campaigns'
 import { fetchSubscribers } from '@/lib/subscribers'
 import { fetchSettings } from '@/lib/settings'
+import { supabase } from '@/lib/supabase/client'
 import type { Campaign, RecipientFilter, Subscriber } from '@/lib/types'
 
 interface FormState {
@@ -54,6 +71,10 @@ function ComposeContent() {
   const [recipientCount, setRecipientCount] = useState<number | null>(null)
   const [showRecipientPicker, setShowRecipientPicker] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const editorRef = useRef<HTMLDivElement>(null)
+  const mediaInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingMedia, setUploadingMedia] = useState(false)
+  const [mediaError, setMediaError] = useState<string | null>(null)
 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -97,6 +118,7 @@ function ComposeContent() {
           htmlContent: c.html_content,
           recipientFilter: c.recipient_filter,
         })
+        if (editorRef.current) editorRef.current.innerHTML = c.html_content
         if (c.scheduled_at) {
           // toISOString() -> "2026-08-26T14:30:00.000Z"; datetime-local wants
           // "2026-08-26T14:30" in local time, so trim seconds/ms/zone.
@@ -254,6 +276,42 @@ function ComposeContent() {
     })
   }
 
+  function runEditorCommand(command: string, value?: string) {
+    editorRef.current?.focus()
+    document.execCommand(command, false, value)
+    setForm((f) => ({ ...f, htmlContent: editorRef.current?.innerHTML ?? '' }))
+  }
+
+  async function handleMediaUpload(file: File | undefined) {
+    if (!file) return
+    setMediaError(null)
+    if (!file.type.startsWith('image/')) {
+      setMediaError('Please choose an image file.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMediaError('Images must be 5 MB or smaller.')
+      return
+    }
+
+    setUploadingMedia(true)
+    try {
+      const path = `campaign-media/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`
+      const { error } = await supabase.storage.from('campaign-media').upload(path, file, {
+        contentType: file.type,
+        upsert: false,
+      })
+      if (error) throw new Error(error.message)
+      const { data } = supabase.storage.from('campaign-media').getPublicUrl(path)
+      runEditorCommand('insertHTML', `<p><img src="${data.publicUrl}" alt="${file.name.replace(/"/g, '')}" style="max-width:100%;height:auto;" /></p>`)
+    } catch (e) {
+      setMediaError((e as Error).message)
+    } finally {
+      setUploadingMedia(false)
+      if (mediaInputRef.current) mediaInputRef.current.value = ''
+    }
+  }
+
   const activeSubscribers = subscribers.filter((s) => s.status === 'active')
 
   if (loading) {
@@ -373,19 +431,75 @@ function ComposeContent() {
               disabled={isLocked}
             />
           </Field>
-          <Field label="Email content (HTML)">
-            <textarea
-              className="field-input min-h-[280px] font-mono text-xs leading-6"
-              placeholder="<p>Hi {{name}},</p>"
-              value={form.htmlContent}
-              onChange={(e) => setForm({ ...form, htmlContent: e.target.value })}
-              disabled={isLocked}
-            />
+          <Field label="Email content">
+            <div className="overflow-hidden rounded-lg border border-input bg-background">
+              <div className="flex flex-wrap items-center gap-1 border-b border-border bg-muted/50 p-2">
+                <EditorButton label="Bold" onClick={() => runEditorCommand('bold')} disabled={isLocked}>
+                  <Bold className="size-4" />
+                </EditorButton>
+                <EditorButton label="Italic" onClick={() => runEditorCommand('italic')} disabled={isLocked}>
+                  <Italic className="size-4" />
+                </EditorButton>
+                <EditorButton label="Underline" onClick={() => runEditorCommand('underline')} disabled={isLocked}>
+                  <Underline className="size-4" />
+                </EditorButton>
+                <span className="mx-1 h-5 w-px bg-border" />
+                <select
+                  className="h-8 rounded border border-border bg-background px-2 text-xs"
+                  defaultValue="p"
+                  aria-label="Text style"
+                  onChange={(e) => runEditorCommand('formatBlock', e.target.value)}
+                  disabled={isLocked}
+                >
+                  <option value="p">Paragraph</option>
+                  <option value="h2">Heading</option>
+                  <option value="h3">Subheading</option>
+                </select>
+                <EditorButton label="Bulleted list" onClick={() => runEditorCommand('insertUnorderedList')} disabled={isLocked}>
+                  <List className="size-4" />
+                </EditorButton>
+                <EditorButton label="Numbered list" onClick={() => runEditorCommand('insertOrderedList')} disabled={isLocked}>
+                  <ListOrdered className="size-4" />
+                </EditorButton>
+                <EditorButton label="Quote" onClick={() => runEditorCommand('formatBlock', 'blockquote')} disabled={isLocked}>
+                  <Quote className="size-4" />
+                </EditorButton>
+                <EditorButton
+                  label="Add link"
+                  onClick={() => {
+                    const url = window.prompt('Paste a link URL')
+                    if (url) runEditorCommand('createLink', url)
+                  }}
+                  disabled={isLocked}
+                >
+                  <LinkIcon className="size-4" />
+                </EditorButton>
+                <EditorButton label="Add image" onClick={() => mediaInputRef.current?.click()} disabled={isLocked || uploadingMedia}>
+                  <ImagePlus className="size-4" />
+                </EditorButton>
+                <input
+                  ref={mediaInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleMediaUpload(e.target.files?.[0])}
+                />
+              </div>
+              <div
+                ref={editorRef}
+                className="email-editor min-h-[280px] p-4 text-sm leading-6 outline-none"
+                contentEditable={!isLocked}
+                data-placeholder="Write your email here..."
+                suppressContentEditableWarning
+                onInput={(e) => setForm({ ...form, htmlContent: e.currentTarget.innerHTML })}
+              />
+            </div>
+            {uploadingMedia && <p className="text-xs text-muted-foreground">Uploading image...</p>}
+            {mediaError && <p className="text-xs text-destructive">{mediaError}</p>}
           </Field>
           <p className="text-xs text-muted-foreground">
-            Use <code className="rounded bg-muted px-1 py-0.5">{'{{name}}'}</code> to personalize
-            with the recipient&apos;s name. A mailing address and unsubscribe link are added
-            automatically.
+            Use <code className="rounded bg-muted px-1 py-0.5">{'{{name}}'}</code> to personalize with the recipient&apos;s name.
+            Uploaded images are hosted in Supabase Storage. A mailing address and unsubscribe link are added automatically.
           </p>
         </div>
 
@@ -595,8 +709,45 @@ function ComposeContent() {
         .field-input:disabled {
           opacity: 0.6;
         }
+        .email-editor:empty::before {
+          color: var(--muted-foreground);
+          content: attr(data-placeholder);
+          pointer-events: none;
+        }
+        .email-editor blockquote {
+          border-left: 3px solid var(--primary);
+          margin: 1rem 0;
+          padding-left: 1rem;
+          color: var(--muted-foreground);
+        }
       `}</style>
     </div>
+  )
+}
+
+function EditorButton({
+  label,
+  onClick,
+  disabled,
+  children,
+}: {
+  label: string
+  onClick: () => void
+  disabled: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-50"
+      aria-label={label}
+      title={label}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
   )
 }
 
