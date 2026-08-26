@@ -20,9 +20,13 @@ export default function SettingsPage() {
     mailing_address: '',
     welcome_subject: '',
     welcome_html: '',
+    confirmation_subject: '',
+    confirmation_html: '',
   })
   const editorRef = useRef<HTMLDivElement>(null)
+  const confirmationEditorRef = useRef<HTMLDivElement>(null)
   const mediaInputRef = useRef<HTMLInputElement>(null)
+  const confirmationMediaInputRef = useRef<HTMLInputElement>(null)
   const [uploadingMedia, setUploadingMedia] = useState(false)
   const [mediaError, setMediaError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -39,8 +43,11 @@ export default function SettingsPage() {
           mailing_address: s.mailing_address ?? '',
           welcome_subject: s.welcome_subject ?? 'Welcome to Basestack Academy',
           welcome_html: s.welcome_html ?? '',
+          confirmation_subject: s.confirmation_subject ?? 'Confirm your Basestack Academy subscription',
+          confirmation_html: s.confirmation_html ?? '',
         })
         if (editorRef.current) editorRef.current.innerHTML = s.welcome_html ?? ''
+        if (confirmationEditorRef.current) confirmationEditorRef.current.innerHTML = s.confirmation_html ?? ''
         setError(null)
       })
       .catch((e: Error) => setError(e.message))
@@ -76,6 +83,8 @@ export default function SettingsPage() {
         mailing_address: form.mailing_address.trim() || null,
         welcome_subject: form.welcome_subject.trim() || 'Welcome to Basestack Academy',
         welcome_html: form.welcome_html.trim(),
+        confirmation_subject: form.confirmation_subject.trim() || 'Confirm your Basestack Academy subscription',
+        confirmation_html: form.confirmation_html.trim(),
       })
       setSettings(updated)
       setSaved(true)
@@ -131,6 +140,49 @@ export default function SettingsPage() {
     } finally {
       setUploadingMedia(false)
       if (mediaInputRef.current) mediaInputRef.current.value = ''
+    }
+  }
+
+  function formatConfirmation(command: string, value?: string) {
+    confirmationEditorRef.current?.focus()
+    document.execCommand(command, false, value)
+    setForm((current) => ({ ...current, confirmation_html: confirmationEditorRef.current?.innerHTML ?? '' }))
+  }
+
+  function handleConfirmationPaste(event: React.ClipboardEvent<HTMLDivElement>) {
+    const clipboardHtml = event.clipboardData.getData('text/html')
+    const clipboardText = event.clipboardData.getData('text/plain')
+    const html = clipboardHtml || (/^\s*<[a-z][\s\S]*>\s*$/i.test(clipboardText) ? clipboardText : '')
+    if (!html) return
+    event.preventDefault()
+    confirmationEditorRef.current?.focus()
+    document.execCommand('insertHTML', false, html)
+    setForm((current) => ({ ...current, confirmation_html: confirmationEditorRef.current?.innerHTML ?? '' }))
+  }
+
+  async function uploadConfirmationImage(file: File | undefined) {
+    if (!file) return
+    setMediaError(null)
+    if (!file.type.startsWith('image/')) {
+      setMediaError('Please choose an image file.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMediaError('Images must be 5 MB or smaller.')
+      return
+    }
+    setUploadingMedia(true)
+    try {
+      const path = `campaign-media/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`
+      const { error } = await supabase.storage.from('campaign-media').upload(path, file, { contentType: file.type, upsert: false })
+      if (error) throw new Error(error.message)
+      const { data } = supabase.storage.from('campaign-media').getPublicUrl(path)
+      formatConfirmation('insertHTML', `<p><img src="${data.publicUrl}" alt="${file.name.replace(/"/g, '')}" style="max-width:100%;height:auto;" /></p>`)
+    } catch (e) {
+      setMediaError((e as Error).message)
+    } finally {
+      setUploadingMedia(false)
+      if (confirmationMediaInputRef.current) confirmationMediaInputRef.current.value = ''
     }
   }
 
@@ -219,6 +271,33 @@ export default function SettingsPage() {
                   </div>
                   {uploadingMedia && <span className="text-xs font-normal text-muted-foreground">Uploading image...</span>}
                   {mediaError && <span className="text-xs font-normal text-destructive">{mediaError}</span>}
+                </label>
+              </div>
+
+              <div className="flex flex-col gap-4 border-t border-border pt-5">
+                <div>
+                  <h3 className="text-sm font-semibold">Verification email</h3>
+                  <p className="mt-1 text-xs font-normal text-muted-foreground">
+                    Sent when someone registers. Include {'{{confirm_url}}'} in a link so they can verify.
+                  </p>
+                </div>
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Subject
+                  <input className="modal-input" value={form.confirmation_subject} onChange={(e) => setForm({ ...form, confirmation_subject: e.target.value })} placeholder="Confirm your subscription" />
+                </label>
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  Message
+                  <div className="overflow-hidden rounded-lg border border-input bg-background">
+                    <div className="flex flex-wrap items-center gap-1 border-b border-border bg-muted/50 p-2">
+                      <WelcomeTool label="Bold" onClick={() => formatConfirmation('bold')}><Bold className="size-4" /></WelcomeTool>
+                      <WelcomeTool label="Italic" onClick={() => formatConfirmation('italic')}><Italic className="size-4" /></WelcomeTool>
+                      <WelcomeTool label="Underline" onClick={() => formatConfirmation('underline')}><Underline className="size-4" /></WelcomeTool>
+                      <WelcomeTool label="Add link" onClick={() => { const url = window.prompt('Paste a link URL'); if (url) formatConfirmation('createLink', url) }}><LinkIcon className="size-4" /></WelcomeTool>
+                      <WelcomeTool label="Add image" onClick={() => confirmationMediaInputRef.current?.click()} disabled={uploadingMedia}><ImagePlus className="size-4" /></WelcomeTool>
+                      <input ref={confirmationMediaInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadConfirmationImage(e.target.files?.[0])} />
+                    </div>
+                    <div ref={confirmationEditorRef} className="welcome-editor min-h-[180px] p-4 text-sm leading-6 outline-none" contentEditable data-placeholder="Write your verification message..." suppressContentEditableWarning onPaste={handleConfirmationPaste} onInput={(e) => setForm({ ...form, confirmation_html: e.currentTarget.innerHTML })} />
+                  </div>
                 </label>
               </div>
 

@@ -84,7 +84,7 @@ export async function POST(request: Request) {
       .eq('id', 1)
       .maybeSingle()
     const welcomeSubject = settings?.welcome_subject || 'Welcome to Basestack Academy'
-    const welcomeBody = (settings?.welcome_html || '<h2>Welcome to Basestack Academy</h2><p>Hi {{name}},</p><p>Thanks for confirming your subscription.</p>')
+    const welcomeBody = (settings?.welcome_html || '<h2>Welcome to Basestack Academy</h2><p>Hi {{name}},</p><p>Thanks for joining our technology learning community.</p>')
       .replace(/\{\{\s*name\s*\}\}/gi, recipientName)
     const html = buildCampaignHtml({
       bodyHtml: welcomeBody,

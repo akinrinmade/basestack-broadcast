@@ -98,7 +98,7 @@ export function PublicSubscribe({
         <h1 className="mt-5 text-3xl font-semibold tracking-tight">Confirm your subscription</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           {status === 'done'
-            ? "You're confirmed. Watch your inbox for practical cloud engineering lessons."
+            ? "You're confirmed. Watch your inbox for practical technology lessons, resources, and updates."
             : status === 'error'
               ? error
               : 'One last step. Confirming your subscription now\u2026'}
@@ -116,7 +116,7 @@ export function PublicSubscribe({
         <h1 className="mt-5 text-3xl font-semibold tracking-tight">You&apos;re confirmed.</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           You&apos;re now on the Basestack Academy broadcast list. Watch your inbox for practical
-          cloud engineering lessons.
+          practical technology lessons, resources, and updates.
         </p>
       </PublicFrame>
     )
@@ -153,7 +153,7 @@ export function PublicSubscribe({
         Basestack Academy
       </p>
       <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-        Practical cloud engineering, delivered.
+        Practical technology learning, delivered.
       </h1>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">
         A short, useful broadcast for builders working with AWS, infrastructure, and systems

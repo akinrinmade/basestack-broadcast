@@ -32,6 +32,8 @@ export interface Settings {
   mailing_address: string | null
   welcome_subject: string
   welcome_html: string
+  confirmation_subject: string
+  confirmation_html: string
   updated_at: string
 }
 
@@ -41,6 +43,8 @@ export interface SettingsInput {
   mailing_address: string | null
   welcome_subject: string
   welcome_html: string
+  confirmation_subject: string
+  confirmation_html: string
 }
 
 export interface DashboardStats {

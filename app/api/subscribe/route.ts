@@ -46,6 +46,12 @@ export async function POST(request: Request) {
 
   const admin = getSupabaseAdmin()
 
+  const { data: settings } = await admin
+    .from('settings')
+    .select('confirmation_subject, confirmation_html, mailing_address')
+    .eq('id', 1)
+    .maybeSingle()
+
   // Reuse an existing row (including one that previously unsubscribed) rather
   // than erroring, so re-subscribing "just works" from the visitor's side.
   const { data: existing } = await admin
@@ -82,21 +88,17 @@ export async function POST(request: Request) {
   if (process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL && confirmToken) {
     const appUrl = getAppUrl(request)
     const confirmUrl = `${appUrl}/subscribe/confirm?token=${confirmToken}`
+    const confirmationBody = (settings?.confirmation_html || '<h2>Confirm your subscription</h2><p>Click below to join Basestack Academy for practical technology lessons, resources, and updates.</p><p><a href="{{confirm_url}}">Confirm subscription</a></p><p>If you did not request this, you can ignore this email.</p>')
+      .replace(/\{\{\s*confirm_url\s*\}\}/gi, confirmUrl)
     const html = buildCampaignHtml({
-      bodyHtml: `
-        <h2 style="margin:0 0 16px;">Confirm your subscription</h2>
-        <p style="margin:0 0 20px;">Click below to start receiving Basestack Academy broadcasts.</p>
-        <p style="margin:0 0 20px;">
-          <a href="${confirmUrl}" style="display:inline-block;background:#18181b;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;">Confirm subscription</a>
-        </p>
-        <p style="margin:0;color:#71717a;font-size:12px;">If you didn\u2019t request this, you can ignore this email.</p>
-      `,
+      bodyHtml: confirmationBody,
       unsubscribeUrl: `${appUrl}/unsubscribe?token=${unsubscribeToken ?? ''}`,
+      mailingAddress: settings?.mailing_address,
     })
 
     await sendEmail({
       to: email,
-      subject: 'Confirm your subscription to Basestack Academy',
+      subject: settings?.confirmation_subject || 'Confirm your Basestack Academy subscription',
       html,
       from: getDefaultFromAddress('Basestack Academy'),
     })

@@ -21,6 +21,8 @@ export async function saveSettings(input: SettingsInput): Promise<Settings> {
       mailing_address: input.mailing_address || null,
       welcome_subject: input.welcome_subject,
       welcome_html: input.welcome_html,
+      confirmation_subject: input.confirmation_subject,
+      confirmation_html: input.confirmation_html,
     })
     .eq('id', 1)
     .select()
