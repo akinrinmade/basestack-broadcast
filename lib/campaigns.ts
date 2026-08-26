@@ -41,7 +41,8 @@ export async function createCampaign(input: CampaignInput): Promise<Campaign> {
       reply_to: input.reply_to || null,
       html_content: input.html_content,
       recipient_filter: input.recipient_filter,
-      status: 'draft',
+      status: input.scheduled_at ? 'scheduled' : 'draft',
+      scheduled_at: input.scheduled_at ?? null,
       created_by: userData.user?.id ?? null,
     })
     .select()
@@ -65,7 +66,37 @@ export async function updateCampaign(
       ...(input.reply_to !== undefined && { reply_to: input.reply_to || null }),
       ...(input.html_content !== undefined && { html_content: input.html_content }),
       ...(input.recipient_filter !== undefined && { recipient_filter: input.recipient_filter }),
+      ...(input.scheduled_at !== undefined && {
+        scheduled_at: input.scheduled_at,
+        status: input.scheduled_at ? 'scheduled' : 'draft',
+      }),
     })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+  return data as Campaign
+}
+
+/** Sets a draft/failed campaign to send automatically at the given time (picked up by the cron job). */
+export async function scheduleCampaign(id: string, scheduledAtIso: string): Promise<Campaign> {
+  const { data, error } = await supabase
+    .from('campaigns')
+    .update({ status: 'scheduled', scheduled_at: scheduledAtIso })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+  return data as Campaign
+}
+
+/** Cancels a pending schedule, returning the campaign to a draft you can edit or send manually. */
+export async function unscheduleCampaign(id: string): Promise<Campaign> {
+  const { data, error } = await supabase
+    .from('campaigns')
+    .update({ status: 'draft', scheduled_at: null })
     .eq('id', id)
     .select()
     .single()

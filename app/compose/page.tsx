@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Eye, Save, Send, TestTube2, Users, X } from 'lucide-react'
+import { Calendar, Eye, Save, Send, TestTube2, Users, X } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
 import { ProtectedRoute } from '@/components/protected-route'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,8 @@ import {
   countEligibleRecipients,
   createCampaign,
   fetchCampaign,
+  scheduleCampaign,
+  unscheduleCampaign,
   updateCampaign,
 } from '@/lib/campaigns'
 import { fetchSubscribers } from '@/lib/subscribers'
@@ -64,6 +66,10 @@ function ComposeContent() {
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ ok: boolean; message: string } | null>(null)
 
+  const [scheduledAtInput, setScheduledAtInput] = useState('')
+  const [scheduling, setScheduling] = useState(false)
+  const [scheduleError, setScheduleError] = useState<string | null>(null)
+
   // Load an existing draft (edit mode), the sender default from settings, and the subscriber list.
   useEffect(() => {
     fetchSettings()
@@ -91,6 +97,15 @@ function ComposeContent() {
           htmlContent: c.html_content,
           recipientFilter: c.recipient_filter,
         })
+        if (c.scheduled_at) {
+          // toISOString() -> "2026-08-26T14:30:00.000Z"; datetime-local wants
+          // "2026-08-26T14:30" in local time, so trim seconds/ms/zone.
+          const local = new Date(c.scheduled_at)
+          const pad = (n: number) => String(n).padStart(2, '0')
+          setScheduledAtInput(
+            `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}T${pad(local.getHours())}:${pad(local.getMinutes())}`,
+          )
+        }
       })
       .catch((e: Error) => setLoadError(e.message))
       .finally(() => setLoading(false))
@@ -196,6 +211,41 @@ function ComposeContent() {
     }
   }
 
+  async function handleSchedule() {
+    setScheduling(true)
+    setScheduleError(null)
+    try {
+      if (!scheduledAtInput) {
+        throw new Error('Pick a date and time first.')
+      }
+      const iso = new Date(scheduledAtInput).toISOString()
+      if (new Date(iso).getTime() <= Date.now()) {
+        throw new Error('Pick a time in the future.')
+      }
+      const saved = await ensureSaved()
+      const updated = await scheduleCampaign(saved.id, iso)
+      setCampaign(updated)
+    } catch (e) {
+      setScheduleError((e as Error).message)
+    } finally {
+      setScheduling(false)
+    }
+  }
+
+  async function handleUnschedule() {
+    if (!campaign) return
+    setScheduling(true)
+    setScheduleError(null)
+    try {
+      const updated = await unscheduleCampaign(campaign.id)
+      setCampaign(updated)
+    } catch (e) {
+      setScheduleError((e as Error).message)
+    } finally {
+      setScheduling(false)
+    }
+  }
+
   function toggleSelectedSubscriber(id: string) {
     setForm((f) => {
       const current = f.recipientFilter.subscriber_ids ?? []
@@ -242,7 +292,29 @@ function ComposeContent() {
         )}
       </div>
 
-      {isLocked && (
+      {isLocked && campaign?.status === 'scheduled' && (
+        <div className="flex flex-col gap-2 rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            This campaign is scheduled to send at{' '}
+            <strong>
+              {campaign.scheduled_at ? new Date(campaign.scheduled_at).toLocaleString() : 'an unknown time'}
+            </strong>
+            . Cancel the schedule to edit it again.
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 gap-2"
+            onClick={handleUnschedule}
+            disabled={scheduling}
+          >
+            <X className="size-4" />
+            {scheduling ? 'Cancelling...' : 'Cancel schedule'}
+          </Button>
+        </div>
+      )}
+
+      {isLocked && campaign?.status !== 'scheduled' && (
         <div className="rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm">
           This campaign is <strong>{campaign?.status}</strong> and can no longer be edited.{' '}
           <Link href={`/campaigns/${campaign?.id}`} className="underline">
@@ -417,6 +489,37 @@ function ComposeContent() {
               )}
             </div>
 
+            {!isLocked && (
+              <div className="mt-1 flex flex-col gap-2 border-t border-border pt-3">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Schedule for later (optional)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="datetime-local"
+                    className="field-input"
+                    value={scheduledAtInput}
+                    onChange={(e) => setScheduledAtInput(e.target.value)}
+                  />
+                  <Button
+                    variant="outline"
+                    className="shrink-0 gap-2"
+                    onClick={handleSchedule}
+                    disabled={
+                      scheduling || !scheduledAtInput || !form.subject.trim() || !form.htmlContent.trim()
+                    }
+                  >
+                    <Calendar className="size-4" />
+                    {scheduling ? 'Scheduling...' : 'Schedule'}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Sent automatically at this time — no need to keep this tab open.
+                </p>
+                {scheduleError && <p className="text-xs text-destructive">{scheduleError}</p>}
+              </div>
+            )}
+
             <div className="mt-1 border-t border-border pt-3">
               <Button
                 className="w-full gap-2"
@@ -424,7 +527,7 @@ function ComposeContent() {
                 disabled={sending || isLocked || !form.subject.trim() || !form.htmlContent.trim()}
               >
                 <Send className="size-4" />
-                {sending ? 'Sending...' : 'Send campaign'}
+                {sending ? 'Sending...' : 'Send campaign now'}
               </Button>
               {saveError && <p className="mt-2 text-xs text-destructive">{saveError}</p>}
               {sendResult && (

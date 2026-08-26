@@ -104,6 +104,8 @@ export interface CampaignInput {
   reply_to: string | null
   html_content: string
   recipient_filter: RecipientFilter
+  /** ISO timestamp. Set to schedule for later; null/undefined leaves it a draft. */
+  scheduled_at?: string | null
 }
 
 export type CampaignSendStatus = 'sent' | 'failed'
