@@ -63,7 +63,7 @@ Require an authenticated session (checked via `lib/supabase/route-auth.ts`):
 
 ## Scheduled Sending
 
-- `GET /api/cron/send-scheduled` — invoked by Vercel Cron every 15 minutes (`vercel.json`)
+- `GET /api/cron/send-scheduled` — invoked by Vercel Cron daily at 00:00 UTC (`vercel.json`)
 - Requires `Authorization: Bearer ${CRON_SECRET}`; returns 503 if `CRON_SECRET` isn't set on the server, 401 if the header doesn't match
 - Loads all campaigns with `status = 'scheduled'` and `scheduled_at <= now()`, then calls the same `sendCampaignToRecipients()` used by the manual send button
 - Safe to run on overlapping/repeated schedules: sends are deduplicated per-recipient via the `campaign_sends` unique constraint, so a campaign already fully sent is a no-op, and a partially-failed campaign only retries the recipients that failed

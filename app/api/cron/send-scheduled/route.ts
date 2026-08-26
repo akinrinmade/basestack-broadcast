@@ -12,7 +12,7 @@ import type { Campaign } from '@/lib/types'
  * so this route rejects any call that doesn't present that secret — without
  * it, this URL would be a public, unauthenticated way to trigger mass sends.
  *
- * Safe to run on a short interval, and safe if two invocations overlap:
+ * Safe to run daily, and safe if two invocations overlap:
  * sendCampaignToRecipients() first claims each campaign with an atomic
  * conditional UPDATE (status must be draft/scheduled/failed to become
  * 'sending'), so only one concurrent caller ever proceeds to send. It's

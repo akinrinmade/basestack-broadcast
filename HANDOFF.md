@@ -35,7 +35,7 @@ IN PROGRESS. Core Phase 6 features are implemented. Production activation still 
 - `lib/server/campaign-service.ts` — shared send logic: resolves eligible recipients (active, filtered by `recipient_filter`), renders per-recipient HTML (name interpolation + unsubscribe link), records outcomes to `campaign_sends`, updates campaign counters/status. Idempotent — skips recipients with an existing successful send row, so retries are safe.
 - `app/api/campaigns/[id]/send/route.ts` — manual send trigger
 - `app/api/campaigns/[id]/test/route.ts` — send a test copy to a single address
-- `app/api/cron/send-scheduled/route.ts` — Vercel Cron target (`vercel.json`, every 15 min); requires `Authorization: Bearer ${CRON_SECRET}`, refuses to run (503) if `CRON_SECRET` isn't set
+- `app/api/cron/send-scheduled/route.ts` — Vercel Cron target (`vercel.json`, daily at 00:00 UTC); requires `Authorization: Bearer ${CRON_SECRET}`, refuses to run (503) if `CRON_SECRET` isn't set
 - `app/compose/page.tsx` — composer UI: draft, save, send, send test, schedule/unschedule a `scheduled_at`
 - `app/campaigns/page.tsx` and `app/campaigns/[id]/page.tsx` — campaign history list and per-campaign send log
 - `app/api/status/route.ts` — reports `emailDeliveryConfigured` and `scheduledJobsConfigured` for the dashboard status tiles

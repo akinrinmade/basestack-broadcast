@@ -20,7 +20,7 @@ Still open: aggregate delivery trends and broader Phase 6 administration feature
 - Campaign composition (subject, HTML body, sender/reply-to overrides, recipient filter)
 - Resend integration for single sends, test sends, and batched sends (chunked at 100/request, concurrency-limited)
 - Manual "Send" and "Send test" actions per campaign
-- Campaign scheduling (set/cancel a `scheduled_at`) with a Vercel Cron job (`/api/cron/send-scheduled`, every 15 minutes) that picks up due campaigns
+- Campaign scheduling (set/cancel a `scheduled_at`) with a daily Vercel Cron job (`/api/cron/send-scheduled`, 00:00 UTC) that picks up due campaigns
 - Cron endpoint is secret-gated (`CRON_SECRET`) so it cannot be triggered by an unauthenticated request
 - Per-recipient send tracking (`campaign_sends`) with a unique `(campaign_id, subscriber_id)` constraint, making retries idempotent — a campaign stuck as `sending`/`failed` can be safely re-sent without double-emailing anyone
 - `/api/status` reports whether Resend and the cron secret are actually configured, which drives the dashboard's system-status tiles
