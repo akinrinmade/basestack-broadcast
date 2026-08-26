@@ -29,6 +29,7 @@ export default function SettingsPage() {
   const confirmationMediaInputRef = useRef<HTMLInputElement>(null)
   const [uploadingMedia, setUploadingMedia] = useState(false)
   const [mediaError, setMediaError] = useState<string | null>(null)
+  const [previewTemplate, setPreviewTemplate] = useState<'welcome' | 'confirmation' | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
@@ -105,7 +106,7 @@ export default function SettingsPage() {
   function handleWelcomePaste(event: React.ClipboardEvent<HTMLDivElement>) {
     const clipboardHtml = event.clipboardData.getData('text/html')
     const clipboardText = event.clipboardData.getData('text/plain')
-    const html = clipboardHtml || (/^\s*<[a-z][\s\S]*>\s*$/i.test(clipboardText) ? clipboardText : '')
+    const html = clipboardHtml || extractPastedHtml(clipboardText)
     if (!html) return
 
     event.preventDefault()
@@ -152,7 +153,7 @@ export default function SettingsPage() {
   function handleConfirmationPaste(event: React.ClipboardEvent<HTMLDivElement>) {
     const clipboardHtml = event.clipboardData.getData('text/html')
     const clipboardText = event.clipboardData.getData('text/plain')
-    const html = clipboardHtml || (/^\s*<[a-z][\s\S]*>\s*$/i.test(clipboardText) ? clipboardText : '')
+    const html = clipboardHtml || extractPastedHtml(clipboardText)
     if (!html) return
     event.preventDefault()
     confirmationEditorRef.current?.focus()
@@ -257,6 +258,7 @@ export default function SettingsPage() {
                       <WelcomeTool label="Underline" onClick={() => formatWelcome('underline')}><Underline className="size-4" /></WelcomeTool>
                       <WelcomeTool label="Add link" onClick={() => { const url = window.prompt('Paste a link URL'); if (url) formatWelcome('createLink', url) }}><LinkIcon className="size-4" /></WelcomeTool>
                       <WelcomeTool label="Add image" onClick={() => mediaInputRef.current?.click()} disabled={uploadingMedia}><ImagePlus className="size-4" /></WelcomeTool>
+                      <button type="button" className="ml-2 rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-background hover:text-foreground" onClick={() => setPreviewTemplate(previewTemplate === 'welcome' ? null : 'welcome')}>Preview</button>
                       <input ref={mediaInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadWelcomeImage(e.target.files?.[0])} />
                     </div>
                     <div
@@ -271,6 +273,7 @@ export default function SettingsPage() {
                   </div>
                   {uploadingMedia && <span className="text-xs font-normal text-muted-foreground">Uploading image...</span>}
                   {mediaError && <span className="text-xs font-normal text-destructive">{mediaError}</span>}
+                  {previewTemplate === 'welcome' && <TemplatePreview html={form.welcome_html} name="there" />}
                 </label>
               </div>
 
@@ -294,10 +297,12 @@ export default function SettingsPage() {
                       <WelcomeTool label="Underline" onClick={() => formatConfirmation('underline')}><Underline className="size-4" /></WelcomeTool>
                       <WelcomeTool label="Add link" onClick={() => { const url = window.prompt('Paste a link URL'); if (url) formatConfirmation('createLink', url) }}><LinkIcon className="size-4" /></WelcomeTool>
                       <WelcomeTool label="Add image" onClick={() => confirmationMediaInputRef.current?.click()} disabled={uploadingMedia}><ImagePlus className="size-4" /></WelcomeTool>
+                      <button type="button" className="ml-2 rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-background hover:text-foreground" onClick={() => setPreviewTemplate(previewTemplate === 'confirmation' ? null : 'confirmation')}>Preview</button>
                       <input ref={confirmationMediaInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadConfirmationImage(e.target.files?.[0])} />
                     </div>
                     <div ref={confirmationEditorRef} className="welcome-editor min-h-[180px] p-4 text-sm leading-6 outline-none" contentEditable data-placeholder="Write your verification message..." suppressContentEditableWarning onPaste={handleConfirmationPaste} onInput={(e) => setForm({ ...form, confirmation_html: e.currentTarget.innerHTML })} />
                   </div>
+                  {previewTemplate === 'confirmation' && <TemplatePreview html={form.confirmation_html} name="there" />}
                 </label>
               </div>
 
@@ -382,5 +387,28 @@ function WelcomeTool({
     <button type="button" className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-50" title={label} aria-label={label} onMouseDown={(e) => e.preventDefault()} onClick={onClick} disabled={disabled}>
       {children}
     </button>
+  )
+}
+
+function extractPastedHtml(text: string): string {
+  const trimmed = text.trim()
+  if (!/<[a-z][\s\S]*>/i.test(trimmed)) return ''
+
+  // Strip document-level wrappers because the editor only needs the body content.
+  const bodyMatch = trimmed.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
+  return (bodyMatch?.[1] ?? trimmed)
+    .replace(/<!doctype[^>]*>/gi, '')
+    .replace(/<\/?html[^>]*>/gi, '')
+    .replace(/<head>[\s\S]*?<\/head>/gi, '')
+    .trim()
+}
+
+function TemplatePreview({ html, name }: { html: string; name: string }) {
+  const rendered = html.replace(/\{\{\s*name\s*\}\}/gi, name).replace(/\{\{\s*confirm_url\s*\}\}/gi, 'https://example.com/confirm')
+  return (
+    <div className="mt-3 overflow-hidden rounded-lg border border-border bg-white">
+      <div className="border-b border-border bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">Live email preview</div>
+      <div className="max-h-80 overflow-y-auto p-4" dangerouslySetInnerHTML={{ __html: rendered || '<p style="color:#71717a;">Nothing to preview yet.</p>' }} />
+    </div>
   )
 }
