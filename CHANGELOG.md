@@ -5,7 +5,7 @@
 ### Added
 - Rate limiting (`lib/server/rate-limit.ts`):
   - Fixed-window limiter backed by new `rate_limits` table (migration `0004_create_rate_limits`)
-  - Applied to `POST /api/subscribe`: 5 requests / 15 minutes per IP, returns `429` with a `Retry-After` header when exceeded
+  - Applied to `POST /api/subscribe`: 5 requests / 15 minutes per IP, returns `429`  with a `Retry-After` header when exceeded
   - `getClientIp()` helper reads `x-forwarded-for` / `x-real-ip`
 - Bounce/complaint webhook (`app/api/webhooks/resend/route.ts`, `lib/server/resend-webhook.ts`):
   - Verifies Resend's Svix-style HMAC-SHA256 webhook signature using Node's built-in `crypto`, with a 5-minute replay-timestamp tolerance
