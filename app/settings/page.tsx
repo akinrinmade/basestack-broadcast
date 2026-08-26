@@ -93,6 +93,18 @@ export default function SettingsPage() {
     setForm((current) => ({ ...current, welcome_html: editorRef.current?.innerHTML ?? '' }))
   }
 
+  function handleWelcomePaste(event: React.ClipboardEvent<HTMLDivElement>) {
+    const clipboardHtml = event.clipboardData.getData('text/html')
+    const clipboardText = event.clipboardData.getData('text/plain')
+    const html = clipboardHtml || (/^\s*<[a-z][\s\S]*>\s*$/i.test(clipboardText) ? clipboardText : '')
+    if (!html) return
+
+    event.preventDefault()
+    editorRef.current?.focus()
+    document.execCommand('insertHTML', false, html)
+    setForm((current) => ({ ...current, welcome_html: editorRef.current?.innerHTML ?? '' }))
+  }
+
   async function uploadWelcomeImage(file: File | undefined) {
     if (!file) return
     setMediaError(null)
@@ -201,6 +213,7 @@ export default function SettingsPage() {
                       contentEditable
                       data-placeholder="Write your welcome message..."
                       suppressContentEditableWarning
+                      onPaste={handleWelcomePaste}
                       onInput={(e) => setForm({ ...form, welcome_html: e.currentTarget.innerHTML })}
                     />
                   </div>

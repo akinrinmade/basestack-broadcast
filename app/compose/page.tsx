@@ -288,6 +288,18 @@ function ComposeContent() {
     setForm((f) => ({ ...f, htmlContent: editorRef.current?.innerHTML ?? '' }))
   }
 
+  function handleEditorPaste(event: React.ClipboardEvent<HTMLDivElement>) {
+    const clipboardHtml = event.clipboardData.getData('text/html')
+    const clipboardText = event.clipboardData.getData('text/plain')
+    const html = clipboardHtml || (/^\s*<[a-z][\s\S]*>\s*$/i.test(clipboardText) ? clipboardText : '')
+    if (!html) return
+
+    event.preventDefault()
+    editorRef.current?.focus()
+    document.execCommand('insertHTML', false, html)
+    setForm((f) => ({ ...f, htmlContent: editorRef.current?.innerHTML ?? '' }))
+  }
+
   async function handleMediaUpload(file: File | undefined) {
     if (!file) return
     setMediaError(null)
@@ -531,6 +543,7 @@ function ComposeContent() {
                 contentEditable={!isLocked}
                 data-placeholder="Write your email here..."
                 suppressContentEditableWarning
+                onPaste={handleEditorPaste}
                 onInput={(e) => setForm({ ...form, htmlContent: e.currentTarget.innerHTML })}
               />
             </div>
