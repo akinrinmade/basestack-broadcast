@@ -1,4 +1,4 @@
-import { PublicSubscribe } from '@/components/broadcast-console'
+import { PublicSubscribe } from '@/components/public-pages'
 
 export default function SubscribePage() {
   return <PublicSubscribe />
