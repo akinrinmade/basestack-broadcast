@@ -2,7 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, CheckCircle2, Pencil, Send, XCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Pencil, Send, XCircle } from 'lucide-react'
 import { AdminShell } from '@/components/admin-shell'
 import { ProtectedRoute } from '@/components/protected-route'
 import { Badge } from '@/components/ui/badge'
@@ -50,6 +50,7 @@ function CampaignDetailContent({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [openersOnly, setOpenersOnly] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -186,11 +187,24 @@ function CampaignDetailContent({ id }: { id: string }) {
       </div>
 
       <div className="rounded-xl border border-border bg-card">
-        <div className="border-b border-border px-5 py-4">
-          <h3 className="font-semibold">Delivery log</h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Per-recipient send results for this campaign.
-          </p>
+        <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
+          <div>
+            <h3 className="font-semibold">Delivery log</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Per-recipient send results, and when each recipient opened this email.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOpenersOnly((v) => !v)}
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+              openersOnly
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            {openersOnly ? `Showing openers (${openedCount})` : 'Show only openers'}
+          </button>
         </div>
         {sends.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 p-10 text-center">
@@ -203,23 +217,44 @@ function CampaignDetailContent({ id }: { id: string }) {
           <div className="max-h-96 overflow-y-auto">
             <table className="w-full text-sm">
               <tbody>
-                {sends.map((s) => (
-                  <tr key={s.id} className="border-b border-border last:border-b-0">
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        {s.status === 'sent' ? (
-                          <CheckCircle2 className="size-3.5 text-primary" />
-                        ) : (
-                          <XCircle className="size-3.5 text-destructive" />
-                        )}
-                        {s.email}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                      {s.status === 'failed' ? s.error : formatDateTime(s.sent_at)}
-                    </td>
-                  </tr>
-                ))}
+                {sends
+                  .filter((s) => !openersOnly || (s.open_count ?? 0) > 0)
+                  .map((s) => {
+                    const opened = (s.open_count ?? 0) > 0
+                    return (
+                      <tr key={s.id} className="border-b border-border last:border-b-0">
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-2">
+                            {s.status === 'sent' ? (
+                              <CheckCircle2 className="size-3.5 text-primary" />
+                            ) : (
+                              <XCircle className="size-3.5 text-destructive" />
+                            )}
+                            {s.email}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                          {s.status === 'failed' ? s.error : formatDateTime(s.sent_at)}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs">
+                          {s.status !== 'sent' ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : opened ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
+                              <Eye className="size-3" />
+                              Opened {formatDateTime(s.opened_at)}
+                              {(s.open_count ?? 0) > 1 ? ` · ${s.open_count}×` : ''}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground">
+                              <EyeOff className="size-3" />
+                              Not opened
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
               </tbody>
             </table>
           </div>
