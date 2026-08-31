@@ -79,6 +79,18 @@ export async function getEligibleRecipients(filter: RecipientFilter): Promise<El
   return (data ?? []) as EligibleSubscriber[]
 }
 
+/**
+ * Campaigns whose html_content is already a complete, self-designed
+ * document (starts with <!doctype ...> or <html ...>) are sent as-is
+ * instead of being wrapped by buildCampaignHtml(). Wrapping a full
+ * document would nest <html> inside <html>, strip the author's own
+ * <head>/<style> block, and double up the compliance footer with the
+ * standard theme's auto-appended one. These documents are expected to
+ * embed {{unsubscribe_url}} (and optionally {{mailing_address}}) tokens
+ * wherever they need a live link, same as {{name}}.
+ */
+const FULL_DOCUMENT_RE = /^\s*<\s*(!doctype|html)\b/i
+
 export function renderCampaignEmail(
   campaign: Pick<Campaign, 'html_content'>,
   recipient: { name: string | null; unsubscribe_token: string },
@@ -87,7 +99,15 @@ export function renderCampaignEmail(
 ): string {
   const appUrl = getAppUrl(request)
   const unsubscribeUrl = `${appUrl}/unsubscribe?token=${recipient.unsubscribe_token}`
-  const bodyHtml = campaign.html_content.replace(/\{\{\s*name\s*\}\}/gi, recipient.name || 'there')
+  const bodyHtml = campaign.html_content
+    .replace(/\{\{\s*name\s*\}\}/gi, recipient.name || 'there')
+    .replace(/\{\{\s*unsubscribe_url\s*\}\}/gi, unsubscribeUrl)
+    .replace(/\{\{\s*mailing_address\s*\}\}/gi, mailingAddress || '')
+
+  if (FULL_DOCUMENT_RE.test(campaign.html_content)) {
+    return bodyHtml
+  }
+
   return buildCampaignHtml({ bodyHtml, unsubscribeUrl, mailingAddress })
 }
 
