@@ -77,6 +77,7 @@ function ComposeContent() {
   const [recipientCount, setRecipientCount] = useState<number | null>(null)
   const [showRecipientPicker, setShowRecipientPicker] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [rawMode, setRawMode] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
   const mediaInputRef = useRef<HTMLInputElement>(null)
   const [uploadingMedia, setUploadingMedia] = useState(false)
@@ -124,7 +125,9 @@ function ComposeContent() {
           htmlContent: c.html_content,
           recipientFilter: c.recipient_filter,
         })
-        if (editorRef.current) editorRef.current.innerHTML = c.html_content
+        const isFullDocument = /^\s*<\s*(!doctype|html)\b/i.test(c.html_content)
+        setRawMode(isFullDocument)
+        if (!isFullDocument && editorRef.current) editorRef.current.innerHTML = c.html_content
         if (c.scheduled_at) {
           // toISOString() -> "2026-08-26T14:30:00.000Z"; datetime-local wants
           // "2026-08-26T14:30" in local time, so trim seconds/ms/zone.
@@ -291,7 +294,7 @@ function ComposeContent() {
   function handleEditorPaste(event: React.ClipboardEvent<HTMLDivElement>) {
     const clipboardHtml = event.clipboardData.getData('text/html')
     const clipboardText = event.clipboardData.getData('text/plain')
-    const html = clipboardHtml || (/^\s*<[a-z][\s\S]*>\s*$/i.test(clipboardText) ? clipboardText : '')
+    const html = clipboardHtml || (/^\s*<\s*(!doctype|[a-z])[\s\S]*>\s*$/i.test(clipboardText) ? clipboardText : '')
     if (!html) return
 
     event.preventDefault()
@@ -452,107 +455,148 @@ function ComposeContent() {
           <Field label="Email content">
             <div className="overflow-hidden rounded-lg border border-input bg-background">
               <div className="flex flex-wrap items-center gap-1 border-b border-border bg-muted/50 p-2">
-                <EditorButton label="Undo" onClick={() => runEditorCommand('undo')} disabled={isLocked}>
-                  <Undo2 className="size-4" />
-                </EditorButton>
-                <EditorButton label="Redo" onClick={() => runEditorCommand('redo')} disabled={isLocked}>
-                  <Redo2 className="size-4" />
-                </EditorButton>
-                <span className="mx-1 h-5 w-px bg-border" />
-                <EditorButton label="Bold" onClick={() => runEditorCommand('bold')} disabled={isLocked}>
-                  <Bold className="size-4" />
-                </EditorButton>
-                <EditorButton label="Italic" onClick={() => runEditorCommand('italic')} disabled={isLocked}>
-                  <Italic className="size-4" />
-                </EditorButton>
-                <EditorButton label="Underline" onClick={() => runEditorCommand('underline')} disabled={isLocked}>
-                  <Underline className="size-4" />
-                </EditorButton>
-                <span className="mx-1 h-5 w-px bg-border" />
-                <select
-                  className="h-8 rounded border border-border bg-background px-2 text-xs"
-                  defaultValue="p"
-                  aria-label="Text style"
-                  onChange={(e) => runEditorCommand('formatBlock', e.target.value)}
-                  disabled={isLocked}
-                >
-                  <option value="p">Paragraph</option>
-                  <option value="h2">Heading</option>
-                  <option value="h3">Subheading</option>
-                </select>
-                <EditorButton label="Bulleted list" onClick={() => runEditorCommand('insertUnorderedList')} disabled={isLocked}>
-                  <List className="size-4" />
-                </EditorButton>
-                <EditorButton label="Numbered list" onClick={() => runEditorCommand('insertOrderedList')} disabled={isLocked}>
-                  <ListOrdered className="size-4" />
-                </EditorButton>
-                <EditorButton label="Quote" onClick={() => runEditorCommand('formatBlock', 'blockquote')} disabled={isLocked}>
-                  <Quote className="size-4" />
-                </EditorButton>
-                <span className="mx-1 h-5 w-px bg-border" />
-                <EditorButton label="Align left" onClick={() => runEditorCommand('justifyLeft')} disabled={isLocked}>
-                  <AlignLeft className="size-4" />
-                </EditorButton>
-                <EditorButton label="Align center" onClick={() => runEditorCommand('justifyCenter')} disabled={isLocked}>
-                  <AlignCenter className="size-4" />
-                </EditorButton>
-                <EditorButton label="Align right" onClick={() => runEditorCommand('justifyRight')} disabled={isLocked}>
-                  <AlignRight className="size-4" />
-                </EditorButton>
-                <EditorButton
-                  label="Add link"
+                <Button
+                  type="button"
+                  variant={rawMode ? 'default' : 'outline'}
+                  size="sm"
+                  className="mr-1 gap-1 text-xs"
                   onClick={() => {
-                    const url = window.prompt('Paste a link URL')
-                    if (url) runEditorCommand('createLink', url)
+                    if (!rawMode && editorRef.current) {
+                      // Switching into raw mode: seed the textarea from whatever's
+                      // currently in the rich editor so nothing is lost.
+                      setForm((f) => ({ ...f, htmlContent: editorRef.current?.innerHTML ?? f.htmlContent }))
+                    }
+                    setRawMode((r) => !r)
                   }}
                   disabled={isLocked}
                 >
-                  <LinkIcon className="size-4" />
-                </EditorButton>
-                <label
-                  className="flex size-8 cursor-pointer items-center justify-center rounded text-muted-foreground hover:bg-background hover:text-foreground has-[:disabled]:opacity-50"
-                  title="Text color"
-                >
-                  <span className="flex size-4 items-end justify-center border-b-4 border-primary text-xs font-bold">A</span>
-                  <input
-                    type="color"
-                    className="sr-only"
-                    aria-label="Text color"
-                    defaultValue="#18181b"
-                    onChange={(e) => runEditorCommand('foreColor', e.target.value)}
-                    disabled={isLocked}
-                  />
-                </label>
-                <EditorButton label="Clear formatting" onClick={() => runEditorCommand('removeFormat')} disabled={isLocked}>
-                  <Eraser className="size-4" />
-                </EditorButton>
-                <EditorButton label="Add image" onClick={() => mediaInputRef.current?.click()} disabled={isLocked || uploadingMedia}>
-                  <ImagePlus className="size-4" />
-                </EditorButton>
-                <input
-                  ref={mediaInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => handleMediaUpload(e.target.files?.[0])}
-                />
+                  {rawMode ? 'Rich text' : 'Edit as HTML'}
+                </Button>
+                {!rawMode && (
+                  <>
+                    <span className="mx-1 h-5 w-px bg-border" />
+                    <EditorButton label="Undo" onClick={() => runEditorCommand('undo')} disabled={isLocked}>
+                      <Undo2 className="size-4" />
+                    </EditorButton>
+                    <EditorButton label="Redo" onClick={() => runEditorCommand('redo')} disabled={isLocked}>
+                      <Redo2 className="size-4" />
+                    </EditorButton>
+                    <span className="mx-1 h-5 w-px bg-border" />
+                    <EditorButton label="Bold" onClick={() => runEditorCommand('bold')} disabled={isLocked}>
+                      <Bold className="size-4" />
+                    </EditorButton>
+                    <EditorButton label="Italic" onClick={() => runEditorCommand('italic')} disabled={isLocked}>
+                      <Italic className="size-4" />
+                    </EditorButton>
+                    <EditorButton label="Underline" onClick={() => runEditorCommand('underline')} disabled={isLocked}>
+                      <Underline className="size-4" />
+                    </EditorButton>
+                    <span className="mx-1 h-5 w-px bg-border" />
+                    <select
+                      className="h-8 rounded border border-border bg-background px-2 text-xs"
+                      defaultValue="p"
+                      aria-label="Text style"
+                      onChange={(e) => runEditorCommand('formatBlock', e.target.value)}
+                      disabled={isLocked}
+                    >
+                      <option value="p">Paragraph</option>
+                      <option value="h2">Heading</option>
+                      <option value="h3">Subheading</option>
+                    </select>
+                    <EditorButton label="Bulleted list" onClick={() => runEditorCommand('insertUnorderedList')} disabled={isLocked}>
+                      <List className="size-4" />
+                    </EditorButton>
+                    <EditorButton label="Numbered list" onClick={() => runEditorCommand('insertOrderedList')} disabled={isLocked}>
+                      <ListOrdered className="size-4" />
+                    </EditorButton>
+                    <EditorButton label="Quote" onClick={() => runEditorCommand('formatBlock', 'blockquote')} disabled={isLocked}>
+                      <Quote className="size-4" />
+                    </EditorButton>
+                    <span className="mx-1 h-5 w-px bg-border" />
+                    <EditorButton label="Align left" onClick={() => runEditorCommand('justifyLeft')} disabled={isLocked}>
+                      <AlignLeft className="size-4" />
+                    </EditorButton>
+                    <EditorButton label="Align center" onClick={() => runEditorCommand('justifyCenter')} disabled={isLocked}>
+                      <AlignCenter className="size-4" />
+                    </EditorButton>
+                    <EditorButton label="Align right" onClick={() => runEditorCommand('justifyRight')} disabled={isLocked}>
+                      <AlignRight className="size-4" />
+                    </EditorButton>
+                    <EditorButton
+                      label="Add link"
+                      onClick={() => {
+                        const url = window.prompt('Paste a link URL')
+                        if (url) runEditorCommand('createLink', url)
+                      }}
+                      disabled={isLocked}
+                    >
+                      <LinkIcon className="size-4" />
+                    </EditorButton>
+                    <label
+                      className="flex size-8 cursor-pointer items-center justify-center rounded text-muted-foreground hover:bg-background hover:text-foreground has-[:disabled]:opacity-50"
+                      title="Text color"
+                    >
+                      <span className="flex size-4 items-end justify-center border-b-4 border-primary text-xs font-bold">A</span>
+                      <input
+                        type="color"
+                        className="sr-only"
+                        aria-label="Text color"
+                        defaultValue="#18181b"
+                        onChange={(e) => runEditorCommand('foreColor', e.target.value)}
+                        disabled={isLocked}
+                      />
+                    </label>
+                    <EditorButton label="Clear formatting" onClick={() => runEditorCommand('removeFormat')} disabled={isLocked}>
+                      <Eraser className="size-4" />
+                    </EditorButton>
+                    <EditorButton label="Add image" onClick={() => mediaInputRef.current?.click()} disabled={isLocked || uploadingMedia}>
+                      <ImagePlus className="size-4" />
+                    </EditorButton>
+                    <input
+                      ref={mediaInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleMediaUpload(e.target.files?.[0])}
+                    />
+                  </>
+                )}
               </div>
-              <div
-                ref={editorRef}
-                className="email-editor min-h-[280px] p-4 text-sm leading-6 outline-none"
-                contentEditable={!isLocked}
-                data-placeholder="Write your email here..."
-                suppressContentEditableWarning
-                onPaste={handleEditorPaste}
-                onInput={(e) => setForm({ ...form, htmlContent: e.currentTarget.innerHTML })}
-              />
+              {rawMode ? (
+                <textarea
+                  className="email-editor min-h-[280px] w-full resize-y p-4 font-mono text-xs leading-6 outline-none"
+                  placeholder="Paste a full HTML document here — it's sent exactly as-is, no wrapping or reformatting."
+                  value={form.htmlContent}
+                  disabled={isLocked}
+                  onChange={(e) => setForm((f) => ({ ...f, htmlContent: e.target.value }))}
+                  spellCheck={false}
+                />
+              ) : (
+                <div
+                  ref={editorRef}
+                  className="email-editor min-h-[280px] p-4 text-sm leading-6 outline-none"
+                  contentEditable={!isLocked}
+                  data-placeholder="Write your email here..."
+                  suppressContentEditableWarning
+                  onPaste={handleEditorPaste}
+                  onInput={(e) => setForm({ ...form, htmlContent: e.currentTarget.innerHTML })}
+                />
+              )}
             </div>
             {uploadingMedia && <p className="text-xs text-muted-foreground">Uploading image...</p>}
             {mediaError && <p className="text-xs text-destructive">{mediaError}</p>}
           </Field>
           <p className="text-xs text-muted-foreground">
             Use <code className="rounded bg-muted px-1 py-0.5">{'{{name}}'}</code> to personalize with the recipient&apos;s name.
-            Uploaded images are hosted in Supabase Storage. A mailing address and unsubscribe link are added automatically.
+            {rawMode ? (
+              <>
+                {' '}In HTML mode, a full document (starting with <code className="rounded bg-muted px-1 py-0.5">{'<!doctype html>'}</code>) is sent as-is — use{' '}
+                <code className="rounded bg-muted px-1 py-0.5">{'{{unsubscribe_url}}'}</code> and{' '}
+                <code className="rounded bg-muted px-1 py-0.5">{'{{mailing_address}}'}</code> in your own markup for those links; nothing is auto-appended.
+              </>
+            ) : (
+              ' Uploaded images are hosted in Supabase Storage. A mailing address and unsubscribe link are added automatically.'
+            )}
           </p>
         </div>
 
