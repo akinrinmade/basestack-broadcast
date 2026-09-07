@@ -85,7 +85,7 @@ export async function snapshotCampaignRecipients(campaign: Campaign): Promise<nu
   const recipients = await getEligibleRecipients(campaign.recipient_filter)
   if (!recipients.length) return 0
   const rows = recipients.map(r => ({ campaign_id: campaign.id, subscriber_id: r.id, email: r.email, name: r.name, unsubscribe_token: r.unsubscribe_token }))
-  const { error } = await admin.from('campaign_recipients').insert(rows)
+  const { error } = await admin.from('campaign_recipients').upsert(rows, { onConflict: 'campaign_id,subscriber_id', ignoreDuplicates: true })
   if (error) throw new Error(error.message)
   await admin.from('campaigns').update({ recipient_count: recipients.length, sent_count: 0, failed_count: 0 }).eq('id', campaign.id)
   return recipients.length
