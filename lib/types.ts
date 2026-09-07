@@ -80,7 +80,7 @@ export interface CsvPreview {
 // Campaigns
 // =========================================================
 
-export type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed' | 'cancelled'
+export type CampaignStatus = 'draft' | 'ready' | 'scheduled' | 'sending' | 'sent' | 'completed' | 'paused' | 'failed' | 'cancelled'
 
 export type RecipientMode = 'all_active' | 'selected'
 
@@ -106,6 +106,36 @@ export interface Campaign {
   created_at: string
   updated_at: string
   sent_at: string | null
+  batch_size: number
+}
+
+export interface CampaignProgress {
+  recipientCount: number
+  sentCount: number
+  pendingCount: number
+  failedCount: number
+  percent: number
+}
+
+export interface CampaignRecipient {
+  id: string
+  campaign_id: string
+  subscriber_id: string | null
+  email: string
+  name: string | null
+  unsubscribe_token: string | null
+  status: 'pending' | 'sent' | 'failed'
+  attempts: number
+  error: string | null
+  sent_at: string | null
+  created_at: string
+}
+
+export interface CampaignMedia {
+  name: string
+  path: string
+  publicUrl: string
+  createdAt?: string
 }
 
 export interface CampaignInput {
@@ -118,6 +148,7 @@ export interface CampaignInput {
   recipient_filter: RecipientFilter
   /** ISO timestamp. Set to schedule for later; null/undefined leaves it a draft. */
   scheduled_at?: string | null
+  batch_size?: number
 }
 
 export type CampaignSendStatus = 'sent' | 'failed'

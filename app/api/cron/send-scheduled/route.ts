@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
-import { CampaignAlreadyClaimedError, sendCampaignToRecipients } from '@/lib/server/campaign-service'
+import { CampaignAlreadyClaimedError, sendNextCampaignBatch } from '@/lib/server/campaign-service'
 import type { Campaign } from '@/lib/types'
 
 /**
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
   const results = []
   for (const campaign of campaigns) {
     try {
-      const result = await sendCampaignToRecipients(campaign, request)
+      const result = await sendNextCampaignBatch(campaign, request)
       results.push({ id: campaign.id, name: campaign.name, ...result })
     } catch (err) {
       if (err instanceof CampaignAlreadyClaimedError) {

@@ -37,18 +37,8 @@ export class CampaignAlreadyClaimedError extends Error {
  * only one caller can ever win the row; the loser gets
  * CampaignAlreadyClaimedError before it sends a single email.
  */
-async function claimCampaignForSending(
-  admin: ReturnType<typeof getSupabaseAdmin>,
-  campaignId: string,
-): Promise<void> {
-  const { data, error } = await admin
-    .from('campaigns')
-    .update({ status: 'sending' })
-    .eq('id', campaignId)
-    .in('status', ['draft', 'scheduled', 'failed'])
-    .select('id')
-    .maybeSingle()
-
+async function claimCampaignForSending(admin: ReturnType<typeof getSupabaseAdmin>, campaignId: string) {
+  const { data, error } = await admin.from('campaigns').update({ status: 'sending' }).eq('id', campaignId).in('status', ['ready', 'scheduled']).select('id').maybeSingle()
   if (error) throw new Error(error.message)
   if (!data) throw new CampaignAlreadyClaimedError()
 }
@@ -59,161 +49,96 @@ function getAppUrl(request: Request): string {
   return new URL(request.url).origin
 }
 
-/** Loads active, eligible subscribers for a campaign's recipient filter. Never includes unsubscribed/suppressed/pending. */
 export async function getEligibleRecipients(filter: RecipientFilter): Promise<EligibleSubscriber[]> {
   const admin = getSupabaseAdmin()
-
-  let query = admin
-    .from('subscribers')
-    .select('id, email, name, unsubscribe_token')
-    .eq('status', 'active')
-
+  let query = admin.from('subscribers').select('id, email, name, unsubscribe_token').eq('status', 'active')
   if (filter.mode === 'selected') {
     const ids = filter.subscriber_ids ?? []
-    if (ids.length === 0) return []
+    if (!ids.length) return []
     query = query.in('id', ids)
   }
-
   const { data, error } = await query
   if (error) throw new Error(error.message)
   return (data ?? []) as EligibleSubscriber[]
 }
 
-/**
- * Campaigns whose html_content is already a complete, self-designed
- * document (starts with <!doctype ...> or <html ...>) are sent as-is
- * instead of being wrapped by buildCampaignHtml(). Wrapping a full
- * document would nest <html> inside <html>, strip the author's own
- * <head>/<style> block, and double up the compliance footer with the
- * standard theme's auto-appended one. These documents are expected to
- * embed {{unsubscribe_url}} (and optionally {{mailing_address}}) tokens
- * wherever they need a live link, same as {{name}}.
- */
 const FULL_DOCUMENT_RE = /^\s*<\s*(!doctype|html)\b/i
 
-export function renderCampaignEmail(
-  campaign: Pick<Campaign, 'html_content'>,
-  recipient: { name: string | null; unsubscribe_token: string },
-  request: Request,
-  mailingAddress?: string | null,
-): string {
-  const appUrl = getAppUrl(request)
-  const unsubscribeUrl = `${appUrl}/unsubscribe?token=${recipient.unsubscribe_token}`
+export function renderCampaignEmail(campaign: Pick<Campaign, 'html_content'>, recipient: { name: string | null; unsubscribe_token: string }, request: Request, mailingAddress?: string | null): string {
+  const unsubscribeUrl = `${getAppUrl(request)}/unsubscribe?token=${recipient.unsubscribe_token}`
   const bodyHtml = campaign.html_content
     .replace(/\{\{\s*name\s*\}\}/gi, recipient.name || 'there')
     .replace(/\{\{\s*unsubscribe_url\s*\}\}/gi, unsubscribeUrl)
     .replace(/\{\{\s*mailing_address\s*\}\}/gi, mailingAddress || '')
-
-  if (FULL_DOCUMENT_RE.test(campaign.html_content)) {
-    return bodyHtml
-  }
-
-  return buildCampaignHtml({ bodyHtml, unsubscribeUrl, mailingAddress })
+  return FULL_DOCUMENT_RE.test(campaign.html_content) ? bodyHtml : buildCampaignHtml({ bodyHtml, unsubscribeUrl, mailingAddress })
 }
 
 export function resolveFromAddress(campaign: Pick<Campaign, 'sender_name' | 'sender_email'>): string {
-  if (campaign.sender_email) {
-    return campaign.sender_name
-      ? `${campaign.sender_name} <${campaign.sender_email}>`
-      : campaign.sender_email
-  }
+  if (campaign.sender_email) return campaign.sender_name ? `${campaign.sender_name} <${campaign.sender_email}>` : campaign.sender_email
   return getDefaultFromAddress(campaign.sender_name)
 }
 
-export interface SendCampaignResult {
-  recipientCount: number
-  sentCount: number
-  failedCount: number
-  status: 'sent' | 'failed'
+export async function snapshotCampaignRecipients(campaign: Campaign): Promise<number> {
+  const admin = getSupabaseAdmin()
+  const { count } = await admin.from('campaign_recipients').select('*', { count: 'exact', head: true }).eq('campaign_id', campaign.id)
+  if ((count ?? 0) > 0) return count ?? 0
+  const recipients = await getEligibleRecipients(campaign.recipient_filter)
+  if (!recipients.length) return 0
+  const rows = recipients.map(r => ({ campaign_id: campaign.id, subscriber_id: r.id, email: r.email, name: r.name, unsubscribe_token: r.unsubscribe_token }))
+  const { error } = await admin.from('campaign_recipients').insert(rows)
+  if (error) throw new Error(error.message)
+  await admin.from('campaigns').update({ recipient_count: recipients.length, sent_count: 0, failed_count: 0 }).eq('id', campaign.id)
+  return recipients.length
 }
 
-/**
- * Sends a campaign to every eligible recipient who hasn't already received
- * it (checked via the campaign_sends unique constraint), records each
- * outcome, and updates the campaign's aggregate counters + status.
- * Safe to call again on a campaign stuck in "sending" or "failed" — it
- * only (re)sends to recipients without a prior successful row.
- */
-export async function sendCampaignToRecipients(
-  campaign: Campaign,
-  request: Request,
-): Promise<SendCampaignResult> {
+export async function markCampaignReady(campaign: Campaign): Promise<number> {
+  const count = await snapshotCampaignRecipients(campaign)
+  if (!count) throw new Error('No eligible active subscribers match this campaign.')
   const admin = getSupabaseAdmin()
+  const { error } = await admin.from('campaigns').update({ status: 'ready', recipient_count: count, scheduled_at: null }).eq('id', campaign.id).in('status', ['draft', 'failed'])
+  if (error) throw new Error(error.message)
+  return count
+}
 
-  // Claim the campaign first, before touching recipients or Resend at all —
-  // see claimCampaignForSending() for why this is what actually makes
-  // concurrent sends safe.
+export interface SendCampaignResult { recipientCount: number; sentCount: number; failedCount: number; pendingCount: number; status: 'ready' | 'completed' | 'failed' }
+
+export async function getCampaignProgress(campaignId: string) {
+  const admin = getSupabaseAdmin()
+  const { data, error } = await admin.from('campaign_recipients').select('status').eq('campaign_id', campaignId)
+  if (error) throw new Error(error.message)
+  const rows = data ?? []
+  const sentCount = rows.filter(r => r.status === 'sent').length
+  const failedCount = rows.filter(r => r.status === 'failed').length
+  const pendingCount = rows.filter(r => r.status === 'pending').length
+  return { recipientCount: rows.length, sentCount, failedCount, pendingCount, percent: rows.length ? Math.round(sentCount / rows.length * 100) : 0 }
+}
+
+export async function sendNextCampaignBatch(campaign: Campaign, request: Request): Promise<SendCampaignResult> {
+  const admin = getSupabaseAdmin()
+  await snapshotCampaignRecipients(campaign)
   await claimCampaignForSending(admin, campaign.id)
-
-  const [{ data: settings }, recipients] = await Promise.all([
-    admin.from('settings').select('mailing_address').eq('id', 1).maybeSingle(),
-    getEligibleRecipients(campaign.recipient_filter),
-  ])
-
-  const { data: alreadySent } = await admin
-    .from('campaign_sends')
-    .select('subscriber_id')
-    .eq('campaign_id', campaign.id)
-    .eq('status', 'sent')
-
-  const alreadySentIds = new Set((alreadySent ?? []).map((r) => r.subscriber_id))
-  const toSend = recipients.filter((r) => !alreadySentIds.has(r.id))
-
-  await admin
-    .from('campaigns')
-    .update({ recipient_count: recipients.length })
-    .eq('id', campaign.id)
-
+  const batchSize = Math.max(1, Math.min(100, campaign.batch_size || 100))
+  const { data: roster, error: rosterError } = await admin.from('campaign_recipients').select('*').eq('campaign_id', campaign.id).in('status', ['pending','failed']).order('created_at').limit(batchSize)
+  if (rosterError) throw new Error(rosterError.message)
+  const batch = roster ?? []
+  if (!batch.length) {
+    await admin.from('campaigns').update({ status: 'completed', sent_at: new Date().toISOString() }).eq('id', campaign.id)
+    const p = await getCampaignProgress(campaign.id)
+    return { recipientCount: p.recipientCount, sentCount: p.sentCount, failedCount: p.failedCount, pendingCount: p.pendingCount, status: 'completed' }
+  }
+  const [{ data: settings }] = await Promise.all([admin.from('settings').select('mailing_address').eq('id', 1).maybeSingle()])
   const from = resolveFromAddress(campaign)
-
-  const emailInputs = toSend.map((recipient) => ({
-    to: recipient.email,
-    subject: campaign.subject,
-    html: renderCampaignEmail(campaign, recipient, request, settings?.mailing_address),
-    from,
-    replyTo: campaign.reply_to || getDefaultReplyTo(),
-  }))
-
-  const results = toSend.length > 0 ? await sendEmailBatch(emailInputs) : []
-
-  const sendRows = toSend.map((recipient, i) => ({
-    campaign_id: campaign.id,
-    subscriber_id: recipient.id,
-    email: recipient.email,
-    status: results[i]?.ok ? 'sent' : 'failed',
-    error: results[i]?.ok ? null : results[i]?.error ?? 'Unknown error',
-    resend_id: results[i]?.id ?? null,
-  }))
-
-  if (sendRows.length > 0) {
-    // Upsert so a retry overwrites a prior failed row for the same recipient.
-    const { error: insertError } = await admin
-      .from('campaign_sends')
-      .upsert(sendRows, { onConflict: 'campaign_id,subscriber_id' })
-    if (insertError) console.error('[campaign-service] failed to record sends', insertError)
+  const results = await sendEmailBatch(batch.map(r => ({ to: r.email, subject: campaign.subject, html: renderCampaignEmail(campaign, { name: r.name, unsubscribe_token: r.unsubscribe_token ?? '' }, request, settings?.mailing_address), from, replyTo: campaign.reply_to || getDefaultReplyTo() })))
+  for (let i = 0; i < batch.length; i++) {
+    const r = batch[i], result = results[i]
+    const status = result?.ok ? 'sent' : 'failed'
+    await admin.from('campaign_recipients').update({ status, attempts: (r.attempts ?? 0) + 1, error: result?.ok ? null : result?.error ?? 'Unknown error', sent_at: result?.ok ? new Date().toISOString() : null }).eq('id', r.id)
+    await admin.from('campaign_sends').upsert({ campaign_id: campaign.id, subscriber_id: r.subscriber_id, email: r.email, status, error: result?.ok ? null : result?.error ?? 'Unknown error', resend_id: result?.id ?? null }, { onConflict: 'campaign_id,subscriber_id' })
   }
-
-  const newSentCount = alreadySentIds.size + results.filter((r) => r.ok).length
-  const newFailedCount = results.filter((r) => !r.ok).length
-  const finalStatus: 'sent' | 'failed' = newFailedCount === 0 ? 'sent' : newSentCount > 0 ? 'sent' : 'failed'
-
-  await admin
-    .from('campaigns')
-    .update({
-      status: finalStatus,
-      recipient_count: recipients.length,
-      sent_count: newSentCount,
-      failed_count: newFailedCount,
-      sent_at: new Date().toISOString(),
-    })
-    .eq('id', campaign.id)
-
-  return {
-    recipientCount: recipients.length,
-    sentCount: newSentCount,
-    failedCount: newFailedCount,
-    status: finalStatus,
-  }
+  const p = await getCampaignProgress(campaign.id)
+  const finalStatus = p.pendingCount === 0 ? 'completed' : 'ready'
+  await admin.from('campaigns').update({ status: finalStatus, recipient_count: p.recipientCount, sent_count: p.sentCount, failed_count: p.failedCount, sent_at: finalStatus === 'completed' ? new Date().toISOString() : null }).eq('id', campaign.id)
+  return { ...p, status: finalStatus }
 }
 
 export async function sendTestEmail(
