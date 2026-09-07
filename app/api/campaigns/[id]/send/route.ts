@@ -16,7 +16,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: 'Campaign not found.' }, { status: 404 })
   const campaign = data as Campaign
-  if (!['ready','scheduled'].includes(campaign.status)) return NextResponse.json({ error: `Campaign must be Ready, Scheduled, or Paused before sending. Current status: ${campaign.status}.` }, { status: 409 })
+  if (!['ready','scheduled'].includes(campaign.status)) return NextResponse.json({ error: `Campaign must be Ready or Scheduled before sending the next batch. Current status: ${campaign.status}.` }, { status: 409 })
   if (!campaign.subject.trim() || !campaign.html_content.trim()) return NextResponse.json({ error: 'Add a subject and content before sending.' }, { status: 400 })
   try { return NextResponse.json(await sendNextCampaignBatch(campaign, request)) }
   catch (err) {
